@@ -21,8 +21,6 @@ go run main.go -f database.txt -qkey "testkey" -p_worse 0.3
 # 生成随机数据库并从热门数据库随机查询
 go run main.go -n 1000 -l 10 -querypop 1 -p_worse 0.7
 
-# 使用概率限制选择热门数据
-go run main.go -n 1000 -l 10 -mode lim -val 0.8 -qkey "specific_key"
 ```
 
 ### 命令行参数
@@ -49,8 +47,8 @@ key value probability
 示例：
 
 ```
-key1 value1 0.95
-key2 value2 0.87
-key3 value3 0.76
-key4 value4 0.65
+key1 value1 0.65
+key2 value2 0.25
+key3 value3 0.09
+key4 value4 0.01
 ```
