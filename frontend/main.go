@@ -558,7 +558,23 @@ func generateRandomDB(numRows, keyLen int) DB {
 	var db DB
 	usedKeys := make(map[string]bool)
 	
+	// 生成随机概率值
+	probabilities := make([]float64, numRows)
+	totalProb := 0.0
+	
 	for i := 0; i < numRows; i++ {
+		probabilities[i] = rand.Float64()
+		totalProb += probabilities[i]
+	}
+	
+	// 归一化概率，使总和为1
+	for i := 0; i < numRows; i++ {
+		probabilities[i] /= totalProb
+	}
+	
+	// 生成记录
+	for i := 0; i < numRows; i++ {
+		// 生成唯一的key
 		var key string
 		for {
 			key = generateRandomString(keyLen)
@@ -569,16 +585,23 @@ func generateRandomDB(numRows, keyLen int) DB {
 		}
 		
 		value := generateRandomString(keyLen)
-		probability := rand.Float64()
 		
 		db.Records = append(db.Records, Record{
 			Key:         key,
 			Value:       value,
-			Probability: probability,
+			Probability: probabilities[i],
 		})
 	}
 	
-	fmt.Printf("Generated %d random records with key length %d\n", numRows, keyLen)
+	// 验证概率总和
+	sum := 0.0
+	for _, record := range db.Records {
+		sum += record.Probability
+	}
+	
+	fmt.Printf("Generated %d random records with key length %d, probability sum: %.6f\n", 
+		numRows, keyLen, sum)
+	
 	return db
 }
 
