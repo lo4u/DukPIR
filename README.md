@@ -1,6 +1,9 @@
+# 面向现实分布的高效动态关键字匿踪查询方案
+
 ## 安装依赖
 
 ```bash
+git clone https://github.com/lo4u/ddpir
 cd frontend
 go mod init ddpir
 go get github.com/seiflotfy/cuckoofilter
