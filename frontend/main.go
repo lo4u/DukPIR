@@ -43,12 +43,13 @@ type PIRDatabase struct {
 
 // OurPIRSystem 表示我们的PIR系统
 type OurPIRSystem struct {
-	FullDatabases    [8]*PIRDatabase
-	PopularDatabases [8]*PIRDatabase
+	FullDatabases    []*PIRDatabase  // 动态大小的数据库数组
+	PopularDatabases []*PIRDatabase  // 动态大小的数据库数组
 	FullFilter       *cf.Filter
 	PopularFilter    *cf.Filter
 	RandomPopularKey string // 随机选择的热门key
 	RandomNonPopularKey string // 随机选择的非热门key
+	ValueChunks      int    // value被分成的块数
 }
 
 // 性能统计
@@ -123,7 +124,7 @@ func parseFlags() Config {
 	flag.IntVar(&config.KeyLen, "l", 0, "Key length for generated data")
 	flag.StringVar(&config.Mode, "mode", "rate", "Selection mode: lim or rate")
 	flag.Float64Var(&config.Val, "val", 0.1, "Value for selection mode")
-	flag.Float64Var(&config.PWorse, "p_worse", 0.5, "Probability to use full database")
+	flag.Float64Var(&config.PWorse, "p_worse", 0.1, "Probability to use full database")
 	flag.StringVar(&config.QueryKey, "qkey", "", "Query key")
 	flag.IntVar(&config.QueryPop, "querypop", 1, "Query from popular database (1) or non-popular (0)")
 	
@@ -196,7 +197,8 @@ func ourPIROffline(config Config) (*OurPIRSystem, *PerformanceStats) {
 	}
 	
 	capacity := len(db.Records)
-	
+	st1 := time.Now()
+		
 	fullFilter := cf.NewFilter(uint(capacity))
 	for _, record := range db.Records {
 		ok := fullFilter.InsertWithValue([]byte(record.Key), record.Value)
@@ -204,7 +206,8 @@ func ourPIROffline(config Config) (*OurPIRSystem, *PerformanceStats) {
 			fmt.Printf("Warning: Failed to insert key %s into full filter\n", record.Key)
 		}
 	}
-	
+		dr1 := time.Since(st1)
+		fmt.Printf("time: %s\n", dr1)
 	popularFilter := cf.NewFilter(uint(len(popularDB.Records) * 2))
 	for _, record := range popularDB.Records {
 		ok := popularFilter.InsertWithValue([]byte(record.Key), record.Value)
@@ -213,8 +216,22 @@ func ourPIROffline(config Config) (*OurPIRSystem, *PerformanceStats) {
 		}
 	}
 	
-	fullDatabases, offlineComm := convertFilterToDatabases(fullFilter)
-	popularDatabases, _ := convertFilterToDatabases(popularFilter)
+	// 计算value需要分成的块数
+	maxValueLen := 0
+	for _, record := range db.Records {
+		if len(record.Value) > maxValueLen {
+			maxValueLen = len(record.Value)
+		}
+	}
+	valueChunks := (maxValueLen + 7) / 8 // 每个块8字节，向上取整
+	if valueChunks == 0 {
+		valueChunks = 1 // 至少一个块
+	}
+	
+	fmt.Printf("Value maximum length: %d bytes, divided into %d chunks\n", maxValueLen, valueChunks)
+	
+	fullDatabases, offlineComm := convertFilterToDatabases(fullFilter, valueChunks)
+	popularDatabases, _ := convertFilterToDatabases(popularFilter, valueChunks)
 	stats.OfflineComm = offlineComm
 	
 	system := &OurPIRSystem{
@@ -224,10 +241,13 @@ func ourPIROffline(config Config) (*OurPIRSystem, *PerformanceStats) {
 		PopularFilter:     popularFilter,
 		RandomPopularKey:  randomPopularKey,
 		RandomNonPopularKey: randomNonPopularKey,
+		ValueChunks:       valueChunks,
 	}
 	
 	fmt.Printf("Offline phase completed: %d full records, %d popular records\n", 
 		len(db.Records), len(popularDB.Records))
+	fmt.Printf("Total databases: %d fingerprint DBs + %d value DBs\n", 
+		4, 4*valueChunks)
 	
 	return system, stats
 }
@@ -236,7 +256,7 @@ func ourPIROffline(config Config) (*OurPIRSystem, *PerformanceStats) {
 func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *PerformanceStats) (bool, string) {
 	useFull := rand.Float64() < pWorse
 	
-	var databases [8]*PIRDatabase
+	var databases []*PIRDatabase
 	var filter *cf.Filter
 	
 	if useFull {
@@ -263,15 +283,18 @@ func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *
 	
 	fmt.Printf("Query key: %s, positions: i1=%d, i2=%d, fp=%d\n", queryKey, i1, i2, fp)
 	
+	// 计算总数据库数量
+	totalDBs := 4 + 4*system.ValueChunks // 4个fingerprint DB + 4*valueChunks个value DB
+	
 	// 生成并执行查询
-	queries := make([]pir.MsgSlice, 16)
-	clientStates := make([]pir.State, 16)
-	results := make([]uint64, 16)
+	queries := make([]pir.MsgSlice, 2*totalDBs) // 每个数据库查询2个位置
+	clientStates := make([]pir.State, 2*totalDBs)
+	results := make([]uint64, 2*totalDBs)
 	
 	var wg sync.WaitGroup
 	
 	// 生成查询
-	for dbIdx := 0; dbIdx < 8; dbIdx++ {
+	for dbIdx := 0; dbIdx < totalDBs; dbIdx++ {
 		for posIdx, pos := range []uint64{uint64(i1), uint64(i2)} {
 			wg.Add(1)
 			go func(dbIdx, posIdx int, pos uint64) {
@@ -290,8 +313,8 @@ func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *
 	stats.OnlineQueryComm = calculateMsgSliceSize(queries)
 	
 	// 执行查询
-	answers := make([]pir.Msg, 16)
-	for i := 0; i < 16; i++ {
+	answers := make([]pir.Msg, 2*totalDBs)
+	for i := 0; i < 2*totalDBs; i++ {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
@@ -308,7 +331,7 @@ func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *
 	stats.OnlineAnswerComm = calculateMsgSize(answers)
 	
 	// 恢复结果
-	for i := 0; i < 16; i++ {
+	for i := 0; i < 2*totalDBs; i++ {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
@@ -328,7 +351,7 @@ func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *
 	}
 	wg.Wait()
 	
-	success, recoveredValue := processResults(results, uint32(fp))
+	success, recoveredValue := processResults(results, uint32(fp), system.ValueChunks)
 	
 	// 验证恢复的值
 	if success && recoveredValue != actualValue {
@@ -340,110 +363,202 @@ func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *
 	return success, recoveredValue
 }
 
-// convertFilterToDatabases 将cuckoo filter转换为8个数据库
-func convertFilterToDatabases(filter *cf.Filter) ([8]*PIRDatabase, float64) {
+// convertFilterToDatabases 将cuckoo filter转换为数据库（并行版本）
+func convertFilterToDatabases(filter *cf.Filter, valueChunks int) ([]*PIRDatabase, float64) {
 	buckets := filter.GetBuckets()
 	values := filter.GetValues()
 	bucketSize := filter.GetBucketSize()
 	numBuckets := len(buckets)
 	
-	databases := [8]*PIRDatabase{}
-	var totalOfflineComm float64
+	// 计算总数据库数量: 4个fingerprint DB + 4 * valueChunks个value DB
+	totalDBs := 4 + 4*valueChunks
+	databases := make([]*PIRDatabase, totalDBs)
 	
-	// fingerprint 数据库 (d=8)
+	// 使用通道和等待组进行并行处理
+	var wg sync.WaitGroup
+	resultChan := make(chan struct {
+		index      int
+		database   *PIRDatabase
+		offlineComm float64
+	}, totalDBs)
+	
+	// 并行初始化fingerprint数据库 (d=8)
 	for slot := 0; slot < 4; slot++ {
-		fingerprintValues := make([]uint64, numBuckets)
-		
-		for bucketIdx := 0; bucketIdx < numBuckets; bucketIdx++ {
-			if slot < len(buckets[bucketIdx]) {
-				fingerprintValues[bucketIdx] = uint64(buckets[bucketIdx][slot])
-			} else {
-				fingerprintValues[bucketIdx] = 0
+		wg.Add(1)
+		go func(slot int) {
+			defer wg.Done()
+			
+			fingerprintValues := make([]uint64, numBuckets)
+			
+			for bucketIdx := 0; bucketIdx < numBuckets; bucketIdx++ {
+				if slot < len(buckets[bucketIdx]) {
+					fingerprintValues[bucketIdx] = uint64(buckets[bucketIdx][slot])
+				} else {
+					fingerprintValues[bucketIdx] = 0
+				}
 			}
-		}
-		
-		pirInst := &pir.SimplePIR{}
-		params := pirInst.PickParams(uint64(numBuckets), 8, 1<<10, 32)
-		db := pir.MakeDB(uint64(numBuckets), 8, &params, fingerprintValues)
-		
-		sharedState := pirInst.Init(db.Info, params)
-		serverState, offlineMsg := pirInst.Setup(db, sharedState, params)
-		
-		// 计算离线通信量
-		totalOfflineComm += calculateMsgSize([]pir.Msg{offlineMsg})
-		
-		databases[slot] = &PIRDatabase{
-			DB:          db,
-			Info:        db.Info,
-			Params:      params,
-			PIR:         pirInst,
-			SharedState: sharedState,
-			ServerState: serverState,
-			OfflineMsg:  offlineMsg,
+			
+			pirInst := &pir.SimplePIR{}
+			params := pirInst.PickParams(uint64(numBuckets), 8, 1<<10, 32)
+			db := pir.MakeDB(uint64(numBuckets), 8, &params, fingerprintValues)
+			
+			sharedState := pirInst.Init(db.Info, params)
+			serverState, offlineMsg := pirInst.Setup(db, sharedState, params)
+			
+			// 计算离线通信量
+			offlineComm := calculateMsgSize([]pir.Msg{offlineMsg})
+			
+			resultChan <- struct {
+				index      int
+				database   *PIRDatabase
+				offlineComm float64
+			}{
+				index: slot,
+				database: &PIRDatabase{
+					DB:          db,
+					Info:        db.Info,
+					Params:      params,
+					PIR:         pirInst,
+					SharedState: sharedState,
+					ServerState: serverState,
+					OfflineMsg:  offlineMsg,
+				},
+				offlineComm: offlineComm,
+			}
+		}(slot)
+	}
+	
+	// 并行初始化value数据库 (d=64)
+	for slot := 0; slot < 4; slot++ {
+		for chunk := 0; chunk < valueChunks; chunk++ {
+			wg.Add(1)
+			go func(slot, chunk int) {
+				defer wg.Done()
+				
+				valueValues := make([]uint64, numBuckets)
+				
+				for bucketIdx := 0; bucketIdx < numBuckets; bucketIdx++ {
+					linearIndex := bucketIdx*bucketSize + slot
+					if linearIndex < len(values) && values[linearIndex] != "" {
+						// 将value分成多个chunk，每个chunk8字节
+						valueBytes := []byte(values[linearIndex])
+						chunkStart := chunk * 8
+						chunkEnd := chunkStart + 8
+						if chunkEnd > len(valueBytes) {
+							chunkEnd = len(valueBytes)
+						}
+						
+						// 提取当前chunk的字节
+						chunkBytes := make([]byte, 8)
+						if chunkStart < len(valueBytes) {
+							copy(chunkBytes, valueBytes[chunkStart:chunkEnd])
+						}
+						
+						valueValues[bucketIdx] = binary.BigEndian.Uint64(chunkBytes)
+					} else {
+						valueValues[bucketIdx] = 0
+					}
+				}
+				
+				pirInst := &pir.SimplePIR{}
+				params := pirInst.PickParams(uint64(numBuckets), 64, 1<<10, 32)
+				db := pir.MakeDB(uint64(numBuckets), 64, &params, valueValues)
+				
+				sharedState := pirInst.Init(db.Info, params)
+				serverState, offlineMsg := pirInst.Setup(db, sharedState, params)
+				
+				// 计算离线通信量
+				offlineComm := calculateMsgSize([]pir.Msg{offlineMsg})
+				
+				// 计算数据库索引: 4 (fingerprint DBs) + slot * valueChunks + chunk
+				dbIndex := 4 + slot*valueChunks + chunk
+				
+				resultChan <- struct {
+					index      int
+					database   *PIRDatabase
+					offlineComm float64
+				}{
+					index: dbIndex,
+					database: &PIRDatabase{
+						DB:          db,
+						Info:        db.Info,
+						Params:      params,
+						PIR:         pirInst,
+						SharedState: sharedState,
+						ServerState: serverState,
+						OfflineMsg:  offlineMsg,
+					},
+					offlineComm: offlineComm,
+				}
+			}(slot, chunk)
 		}
 	}
 	
-	// value 数据库 (d=64)
-	for slot := 0; slot < 4; slot++ {
-		valueValues := make([]uint64, numBuckets)
-		
-		for bucketIdx := 0; bucketIdx < numBuckets; bucketIdx++ {
-			linearIndex := bucketIdx*bucketSize + slot
-			if linearIndex < len(values) && values[linearIndex] != "" {
-				valueValues[bucketIdx] = stringToUint64(values[linearIndex])
-			} else {
-				valueValues[bucketIdx] = 0
-			}
-		}
-		
-		pirInst := &pir.SimplePIR{}
-		params := pirInst.PickParams(uint64(numBuckets), 64, 1<<10, 32)
-		db := pir.MakeDB(uint64(numBuckets), 64, &params, valueValues)
-		
-		sharedState := pirInst.Init(db.Info, params)
-		serverState, offlineMsg := pirInst.Setup(db, sharedState, params)
-		
-		// 计算离线通信量
-		totalOfflineComm += calculateMsgSize([]pir.Msg{offlineMsg})
-		
-		databases[4+slot] = &PIRDatabase{
-			DB:          db,
-			Info:        db.Info,
-			Params:      params,
-			PIR:         pirInst,
-			SharedState: sharedState,
-			ServerState: serverState,
-			OfflineMsg:  offlineMsg,
-		}
+	// 等待所有goroutine完成
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+	
+	// 收集结果
+	var totalOfflineComm float64
+	for result := range resultChan {
+		databases[result.index] = result.database
+		totalOfflineComm += result.offlineComm
 	}
 	
 	return databases, totalOfflineComm
 }
 
 // processResults 处理查询结果
-func processResults(results []uint64, fp uint32) (bool, string) {
+func processResults(results []uint64, fp uint32, valueChunks int) (bool, string) {
 	fingerprintMatches := 0
-	var matchedValue string
+	matchedValueChunks := make([][]byte, 4) // 每个slot的value chunks
 	
 	for i := 0; i < 4; i++ {
 		pos1Result := results[i*2]
 		pos2Result := results[i*2+1]
 		
-		if uint32(pos1Result) == fp {
+		// 检查fingerprint匹配
+		if uint32(pos1Result) == fp || uint32(pos2Result) == fp {
 			fingerprintMatches++
-			valueResult := results[(4+i)*2]
-			matchedValue = uint64ToString(valueResult)
-		}
-		
-		if uint32(pos2Result) == fp {
-			fingerprintMatches++
-			valueResult := results[(4+i)*2+1]
-			matchedValue = uint64ToString(valueResult)
+			
+			// 收集该slot的所有value chunks
+			slotValueChunks := make([]byte, 0)
+			for chunk := 0; chunk < valueChunks; chunk++ {
+				// 计算value数据库的索引
+				valueDBIndex1 := 4 + i*valueChunks + chunk
+				valueDBIndex2 := valueDBIndex1 + 1 // 第二个位置
+				
+				// 获取两个位置的value chunk
+				var valueChunk uint64
+				if uint32(pos1Result) == fp {
+					valueChunk = results[valueDBIndex1*2] // i1位置的value
+				} else {
+					valueChunk = results[valueDBIndex2*2+1] // i2位置的value
+				}
+				
+				// 将uint64转换为字节
+				chunkBytes := make([]byte, 8)
+				binary.BigEndian.PutUint64(chunkBytes, valueChunk)
+				slotValueChunks = append(slotValueChunks, chunkBytes...)
+			}
+			matchedValueChunks[i] = slotValueChunks
 		}
 	}
 	
 	if fingerprintMatches == 1 {
-		return true, matchedValue
+		// 找到匹配的slot
+		for i := 0; i < 4; i++ {
+			if matchedValueChunks[i] != nil {
+				// 去除尾部的零字节
+				valueBytes := matchedValueChunks[i]
+				for len(valueBytes) > 0 && valueBytes[len(valueBytes)-1] == 0 {
+					valueBytes = valueBytes[:len(valueBytes)-1]
+				}
+				return true, string(valueBytes)
+			}
+		}
 	}
 	
 	return false, ""
@@ -475,34 +590,6 @@ func calculateMsgSliceSize(msgSlices []pir.MsgSlice) float64 {
 		}
 	}
 	return totalBytes / (1024.0 * 1024.0) // 转换为MB
-}
-
-func stringToUint64(s string) uint64 {
-	if len(s) == 0 {
-		return 0
-	}
-	
-	if len(s) > 8 {
-		s = s[:8]
-	}
-	
-	bytes := []byte(s)
-	for len(bytes) < 8 {
-		bytes = append(bytes, 0)
-	}
-	
-	return binary.BigEndian.Uint64(bytes)
-}
-
-func uint64ToString(val uint64) string {
-	bytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(bytes, val)
-	
-	for len(bytes) > 0 && bytes[len(bytes)-1] == 0 {
-		bytes = bytes[:len(bytes)-1]
-	}
-	
-	return string(bytes)
 }
 
 // 数据库操作函数

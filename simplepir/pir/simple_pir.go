@@ -4,6 +4,7 @@ package pir
 // #include "pir.h"
 import "C"
 import "fmt"
+// import "time"
 
 type SimplePIR struct{}
 
