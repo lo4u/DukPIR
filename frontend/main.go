@@ -87,7 +87,7 @@ func main() {
 	stats.OfflineTime = time.Since(startOffline)
 	if config.QueryKey == "" {
 		// 测试删除和添加功能
-		testUpdateFunctions(system,stats)
+		testUpdateFunctions(system,stats,config.KeyLen)
 	}
 
 	// 运行在线阶段
@@ -1183,13 +1183,13 @@ func (system *OurPIRSystem) updateValueInFilterAndDatabase(filter *cf.Filter, da
 }
 
 // testUpdateFunctions 测试更新功能
-func testUpdateFunctions(system *OurPIRSystem,  stats *PerformanceStats) {
+func testUpdateFunctions(system *OurPIRSystem,  stats *PerformanceStats, KeyLen int) {
     fmt.Println("\n=== Testing Update Functions ===")
         
     // 测试添加新项目
-    testKey := "tk_12345"
-    testValue := "tv_45678"
-    newValue := "tv_upded"
+    testKey := generateRandomString(KeyLen)
+    testValue := generateRandomString(KeyLen)
+    newValue := generateRandomString(KeyLen)
     
     // 添加操作
     start := time.Now()
