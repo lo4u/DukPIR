@@ -5,6 +5,9 @@ package pir
 import "C"
 import "fmt"
 import "math/big"
+import "bufio"
+import "os"
+import "strconv"
 
 type Matrix struct {
 	Rows uint64
@@ -479,4 +482,71 @@ func (m *Matrix) PrintStart() {
                 }
                 fmt.Printf("\n")
         }
+}
+
+// PrintToFile 以追加模式把矩阵写入 filename，列按最大宽度对齐。
+// 如果文件不存在会创建它；不会覆盖已有内容。
+func (m *Matrix) PrintToFile(filename string) error {
+	// 打开文件：追加、可写、如果不存在则创建
+	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	w := bufio.NewWriter(f)
+
+	// 写入头信息（单独一行）
+	if _, err := fmt.Fprintf(w, "%d-by-%d matrix:\n", m.Rows, m.Cols); err != nil {
+		return err
+	}
+
+	// 快速处理空矩阵
+	if m.Rows == 0 || m.Cols == 0 {
+		if err := w.Flush(); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	rows := int(m.Rows)
+	cols := int(m.Cols)
+
+	// 计算每一列的最大宽度（按数字的字符串长度）
+	colWidths := make([]int, cols)
+	for i := 0; i < rows; i++ {
+		for j := 0; j < cols; j++ {
+			val := m.Data[uint64(i)*m.Cols+uint64(j)]
+			l := len(strconv.FormatUint(uint64(val), 10))
+			if l > colWidths[j] {
+				colWidths[j] = l
+			}
+		}
+	}
+
+	// 输出每一行，按列宽右对齐，列之间保留一个空格
+	for i := 0; i < rows; i++ {
+		for j := 0; j < cols; j++ {
+			val := m.Data[uint64(i)*m.Cols+uint64(j)]
+			// 使用动态宽度：%*d 对齐到 colWidths[j]
+			if _, err := fmt.Fprintf(w, "%*d", colWidths[j], val); err != nil {
+				return err
+			}
+			// 列间空格（最后一列也加换行而不是额外空格）
+			if j < cols-1 {
+				if _, err := fmt.Fprint(w, " "); err != nil {
+					return err
+				}
+			}
+		}
+		if _, err := fmt.Fprint(w, "\n"); err != nil {
+			return err
+		}
+	}
+
+	// flush 并返回可能的错误
+	if err := w.Flush(); err != nil {
+		return err
+	}
+	return nil
 }

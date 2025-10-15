@@ -318,3 +318,25 @@ func (cf *Filter) GetBucketPow() uint {
 func (cf *Filter) GetBucketSize() int {
     return bucketSize
 }
+
+func (cf *Filter) SetValue(key []byte, newValue string) bool {
+	i1, fp := GetIndexAndFingerprint(key, cf.bucketPow)
+	// 查找第一个候选桶
+	if idx := cf.buckets[i1].getFingerprintIndex(fp); idx > -1 {
+		linear := int(i1)*bucketSize + idx
+		if linear < len(cf.values) {
+			cf.values[linear] = newValue
+			return true
+		}
+	}
+	// 查找另一个候选桶
+	i2 := GetAltIndex(fp, i1, cf.bucketPow)
+	if idx := cf.buckets[i2].getFingerprintIndex(fp); idx > -1 {
+		linear := int(i2)*bucketSize + idx
+		if linear < len(cf.values) {
+			cf.values[linear] = newValue
+			return true
+		}
+	}
+	return false
+}

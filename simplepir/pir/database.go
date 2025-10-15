@@ -1,7 +1,7 @@
 package pir
 
 import "math"
-import "fmt"
+// import "fmt"
 
 type DBinfo struct {
 	Num        uint64 // number of DB entries.
@@ -151,8 +151,8 @@ func SetupDB(Num, row_length uint64, p *Params) *Database {
 	D.Info.Basis = 0
 	D.Info.Squishing = 0
 
-	fmt.Printf("Total packed DB size is ~%f MB\n",
-		float64(p.L*p.M)*math.Log2(float64(p.P))/(1024.0*1024.0*8.0))
+	// fmt.Printf("Total packed DB size is ~%f MB\n",
+	// 	float64(p.L*p.M)*math.Log2(float64(p.P))/(1024.0*1024.0*8.0))
 
 	if db_elems > p.L*p.M {
 		panic("Params and database size don't match")

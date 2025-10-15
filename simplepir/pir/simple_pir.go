@@ -32,7 +32,7 @@ func (pi *SimplePIR) PickParams(N, d, n, logq uint64) Params {
 			if !found {
 				panic("Error; should not happen")
 			}
-			good_p.PrintParams()
+			// good_p.PrintParams()
 			return good_p
 		}
 
@@ -98,7 +98,8 @@ func (pi *SimplePIR) GetBW(info DBinfo, p Params) {
 }
 
 func (pi *SimplePIR) Init(info DBinfo, p Params) State {
-        A := MatrixRand(p.M, p.N, p.Logq, 0)
+        A := MatrixZeros(p.M, p.N)
+		A.Add(1)
         return MakeState(A)
 }
 
