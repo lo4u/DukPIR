@@ -1,4 +1,3 @@
-// main.go
 package main
 
 import (
@@ -54,14 +53,15 @@ type OurPIRSystem struct {
 
 // 性能统计
 type PerformanceStats struct {
-	OfflineTime     time.Duration
-	addTime 		time.Duration
-	updateTime 		time.Duration
-	deleteTime 		time.Duration
-	OnlineTime      time.Duration
-	OfflineComm     float64 // MB
-	OnlineQueryComm float64 // MB
-	OnlineAnswerComm float64 // MB
+	OfflineTime        time.Duration
+	addTime            time.Duration
+	updateTime         time.Duration
+	deleteTime         time.Duration
+	OnlineQueryTime    time.Duration  // 客户端生成查询的时间
+	OnlineResponseTime time.Duration  // 服务器生成应答并恢复结果的时间
+	OfflineComm        float64 // MB
+	OnlineQueryComm    float64 // KB (修改为KB)
+	OnlineAnswerComm   float64 // KB (修改为KB)
 }
 
 // 命令行参数
@@ -87,14 +87,12 @@ func main() {
 	stats.OfflineTime = time.Since(startOffline)
 	if config.QueryKey == "" {
 		// 测试删除和添加功能
-		testUpdateFunctions(system,stats,config.KeyLen)
+		testUpdateFunctions(system,stats,config.PWorse, config.KeyLen)
 	}
 
 	// 运行在线阶段
 	if config.QueryKey != "" {
-		startOnline := time.Now()
 		success, value := ourPIROnline(system, config.QueryKey, config.PWorse, stats)
-		stats.OnlineTime = time.Since(startOnline)
 		fmt.Printf("Query result: success=%v, value=%s\n", success, value)
 	} else {
 		var queryKey string
@@ -104,9 +102,7 @@ func main() {
 			queryKey = system.RandomNonPopularKey
 		}
 		
-		startOnline := time.Now()
 		success, value := ourPIROnline(system, queryKey, config.PWorse, stats)
-		stats.OnlineTime = time.Since(startOnline)
 		fmt.Printf("Query key: %s\n", queryKey)
 		fmt.Printf("Query result: success=%v, value=%s\n", success, value)
 	}
@@ -117,12 +113,14 @@ func main() {
 	fmt.Printf("Add operation time: %v\n", stats.addTime)
     fmt.Printf("Update operation time: %v\n", stats.updateTime)
     fmt.Printf("Delete operation time: %v\n", stats.deleteTime)
-	fmt.Printf("Online Time: %.2f ms\n", float64(stats.OnlineTime.Microseconds())/1000.0)
+	fmt.Printf("Online Query Time: %.2f ms\n", float64(stats.OnlineQueryTime.Microseconds())/1000.0)
+	fmt.Printf("Online Response Time: %.2f ms\n", float64(stats.OnlineResponseTime.Microseconds())/1000.0)
+	fmt.Printf("Total Online Time: %.2f ms\n", float64((stats.OnlineQueryTime + stats.OnlineResponseTime).Microseconds())/1000.0)
 	fmt.Printf("Offline Communication: %.4f MB\n", stats.OfflineComm)
-	fmt.Printf("Online Query Communication: %.4f MB\n", stats.OnlineQueryComm)
-	fmt.Printf("Online Answer Communication: %.4f MB\n", stats.OnlineAnswerComm)
+	fmt.Printf("Online Query Communication: %.4f KB\n", stats.OnlineQueryComm)
+	fmt.Printf("Online Answer Communication: %.4f KB\n", stats.OnlineAnswerComm)
 	fmt.Printf("Total Communication: %.4f MB\n", 
-		stats.OfflineComm + stats.OnlineQueryComm + stats.OnlineAnswerComm)
+		stats.OfflineComm + (stats.OnlineQueryComm + stats.OnlineAnswerComm)/(1024.0))
 }
 
 // parseFlags 解析命令行参数
@@ -302,7 +300,8 @@ func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *
 	
 	var wg sync.WaitGroup
 	
-	// 生成查询
+	// 生成查询 - 统计客户端时间
+	startQuery := time.Now()
 	for dbIdx := 0; dbIdx < totalDBs; dbIdx++ {
 		for posIdx, pos := range []uint64{uint64(i1), uint64(i2)} {
 			wg.Add(1)
@@ -317,11 +316,13 @@ func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *
 		}
 	}
 	wg.Wait()
+	stats.OnlineQueryTime = time.Since(startQuery)
+	// comm = float64(query.Size() * uint64(p.Logq) / (8.0 * 1024.0))
+	// 计算查询通信量 (KB)
+	stats.OnlineQueryComm = calculateMsgSliceSizeKB(queries)
 	
-	// 计算查询通信量
-	stats.OnlineQueryComm = calculateMsgSliceSize(queries)
-	
-	// 执行查询
+	// 执行查询和恢复结果 - 统计服务器时间
+	startResponse := time.Now()
 	answers := make([]pir.Msg, 2*totalDBs)
 	for i := 0; i < 2*totalDBs; i++ {
 		wg.Add(1)
@@ -336,8 +337,8 @@ func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *
 	}
 	wg.Wait()
 	
-	// 计算应答通信量
-	stats.OnlineAnswerComm = calculateMsgSize(answers)
+	// 计算应答通信量 (KB)
+	stats.OnlineAnswerComm = calculateMsgSizeKB(answers)
 	
 	// 恢复结果
 	for i := 0; i < 2*totalDBs; i++ {
@@ -359,6 +360,7 @@ func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *
 		}(i)
 	}
 	wg.Wait()
+	stats.OnlineResponseTime = time.Since(startResponse)
 	
 	success, recoveredValue := processResults(results, uint32(fp), system.ValueChunks)
 	
@@ -378,7 +380,7 @@ func convertFilterToDatabases(filter *cf.Filter, valueChunks int) ([]*PIRDatabas
 	values := filter.GetValues()
 	bucketSize := filter.GetBucketSize()
 	numBuckets := len(buckets)
-	
+	fmt.Printf("Converting filter to databases: %d buckets, bucket size %d\n", numBuckets, bucketSize)
 	// 计算总数据库数量: 4个fingerprint DB + 4 * valueChunks个value DB
 	totalDBs := 4 + 4*valueChunks
 	databases := make([]*PIRDatabase, totalDBs)
@@ -413,9 +415,9 @@ func convertFilterToDatabases(filter *cf.Filter, valueChunks int) ([]*PIRDatabas
 			
 			sharedState := pirInst.Init(db.Info, params)
 			serverState, offlineMsg := pirInst.Setup(db, sharedState, params)
-			
+			offlineComm := float64(offlineMsg.Size() * uint64(32) / (8.0 * 1024.0 * 1024.0))
 			// 计算离线通信量
-			offlineComm := calculateMsgSize([]pir.Msg{offlineMsg})
+			// offlineComm := calculateMsgSize([]pir.Msg{offlineMsg})
 			
 			resultChan <- struct {
 				index      int
@@ -573,7 +575,7 @@ func processResults(results []uint64, fp uint32, valueChunks int) (bool, string)
 	return false, ""
 }
 
-// 计算Msg的大小（MB）
+// 计算Msg的大小（MB）- 用于离线通信量
 func calculateMsgSize(msgs []pir.Msg) float64 {
 	totalBytes := 0.0
 	for _, msg := range msgs {
@@ -586,7 +588,7 @@ func calculateMsgSize(msgs []pir.Msg) float64 {
 	return totalBytes / (1024.0 * 1024.0) // 转换为MB
 }
 
-// 计算MsgSlice的大小（MB）
+// 计算MsgSlice的大小（MB）- 用于离线通信量
 func calculateMsgSliceSize(msgSlices []pir.MsgSlice) float64 {
 	totalBytes := 0.0
 	for _, msgSlice := range msgSlices {
@@ -599,6 +601,34 @@ func calculateMsgSliceSize(msgSlices []pir.MsgSlice) float64 {
 		}
 	}
 	return totalBytes / (1024.0 * 1024.0) // 转换为MB
+}
+
+// 计算Msg的大小（KB）- 用于在线通信量
+func calculateMsgSizeKB(msgs []pir.Msg) float64 {
+	totalBytes := 0.0
+	for _, msg := range msgs {
+		for _, matrix := range msg.Data {
+			// 每个矩阵元素占4字节（uint64）
+			elements := float64(matrix.Rows * matrix.Cols)
+			totalBytes += elements * 4.0
+		}
+	}
+	return totalBytes / 1024.0 // 转换为KB
+}
+
+// 计算MsgSlice的大小（KB）- 用于在线通信量
+func calculateMsgSliceSizeKB(msgSlices []pir.MsgSlice) float64 {
+	totalBytes := 0.0
+	for _, msgSlice := range msgSlices {
+		for _, msg := range msgSlice.Data {
+			for _, matrix := range msg.Data {
+				// 每个矩阵元素占8字节（uint64）
+				elements := float64(matrix.Rows * matrix.Cols)
+				totalBytes += elements * 4.0
+			}
+		}
+	}
+	return totalBytes / 1024.0 // 转换为KB
 }
 
 // 数据库操作函数
@@ -1183,7 +1213,7 @@ func (system *OurPIRSystem) updateValueInFilterAndDatabase(filter *cf.Filter, da
 }
 
 // testUpdateFunctions 测试更新功能
-func testUpdateFunctions(system *OurPIRSystem,  stats *PerformanceStats, KeyLen int) {
+func testUpdateFunctions(system *OurPIRSystem,  stats *PerformanceStats, p_worse float64, KeyLen int) {
     fmt.Println("\n=== Testing Update Functions ===")
         
     // 测试添加新项目
@@ -1205,7 +1235,7 @@ func testUpdateFunctions(system *OurPIRSystem,  stats *PerformanceStats, KeyLen 
     
     // 测试查询新添加的项目
     fmt.Printf("Querying the added item: \n")
-    success, value := ourPIROnline(system, testKey, 0.1, &PerformanceStats{})
+    success, value := ourPIROnline(system, testKey, p_worse, &PerformanceStats{})
     fmt.Printf("Query after addition: success=%v, value=%s\n\n", success, value)
     
     // 测试更新项目
@@ -1222,7 +1252,7 @@ func testUpdateFunctions(system *OurPIRSystem,  stats *PerformanceStats, KeyLen 
     
     // 测试查询更新后的项目
     fmt.Printf("Querying the updated item:\n")
-    success, value = ourPIROnline(system, testKey, 0.1, &PerformanceStats{})
+    success, value = ourPIROnline(system, testKey, p_worse, &PerformanceStats{})
     fmt.Printf("Query after update: success=%v, value=%s\n\n", success, value)
     
     // 测试删除项目
@@ -1239,7 +1269,7 @@ func testUpdateFunctions(system *OurPIRSystem,  stats *PerformanceStats, KeyLen 
     
     // 测试查询已删除的项目
     fmt.Printf("Querying the deleted item:\n")
-    success, value = ourPIROnline(system, testKey, 0.1, &PerformanceStats{})
+    success, value = ourPIROnline(system, testKey, p_worse, &PerformanceStats{})
     fmt.Printf("Query after deletion: success=%v, value=%s\n\n", success, value)
 
 }

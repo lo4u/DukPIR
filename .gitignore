@@ -1,1 +1,5 @@
 *.txt
+*.csv
+*.log
+production-app
+ddpir

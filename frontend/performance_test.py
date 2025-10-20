@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+"""
+性能测试脚本 - 用于测试PIR系统性能
+"""
+
+import subprocess
+import datetime
+import time
+import sys
+import os
+
+def run_test(db_size, key_len, p_worse, querypop, test_name, run_count=10):
+    """
+    运行单个测试配置
+    """
+    print(f"\n{'='*80}")
+    print(f"开始测试: {test_name}")
+    print(f"时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"参数: db_size={db_size}, key_len={key_len}, p_worse={p_worse}, querypop={querypop}")
+    print(f"{'='*80}")
+    
+    for i in range(1, run_count + 1):
+        print(f"\n{'-'*60}")
+        print(f"第 {i} 次运行:")
+        print(f"{'-'*60}")
+        
+        # 构建命令参数
+        cmd = ['./production-app', '-n', str(db_size), '-l', str(key_len), 
+               '-p_worse', str(p_worse), '-querypop', str(querypop)]
+        
+        # 执行命令
+        try:
+            result = subprocess.run(cmd, capture_output=False, text=True, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"命令执行失败: {e}")
+        except FileNotFoundError:
+            print("错误: 未找到 production-app 可执行文件")
+            return
+    
+    print(f"\n{'='*80}")
+    print(f"完成测试: {test_name}")
+    print(f"时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"{'='*80}\n")
+
+def test_suite_a():
+    """
+    测试套件a: 不同数据库大小，固定键值长度1KB
+    """
+    print("开始测试套件 A")
+    print("数据库大小: 2^16 到 2^20, 键值长度: 1KB")
+    
+    db_sizes = [2**16, 2**17, 2**18, 2**19, 2**20]
+    key_len = 1024  # 1KB
+    
+    for db_size in db_sizes:
+        for p_worse in [0, 1]:
+            for querypop in [0, 1]:
+                # 跳过 p_worse=0 且 querypop=0 的情况
+                if p_worse == 0 and querypop == 0:
+                    continue
+                
+                test_name = f"A_db{db_size}_len{key_len}_p{p_worse}_q{querypop}"
+                run_test(db_size, key_len, p_worse, querypop, test_name)
+
+def test_suite_b():
+    """
+    测试套件b: 不同数据库大小和键值长度组合
+    """
+    print("开始测试套件 B")
+    print("不同数据库大小和键值长度组合")
+    
+    test_cases = [
+        (2**20, 256),      # 1MB数据库，256B键值
+        (2**17, 30*1024),  # 128KB数据库，30KB键值  
+        (2**14, 100*1024)  # 16KB数据库，100KB键值
+    ]
+    
+    for db_size, key_len in test_cases:
+        for p_worse in [0, 1]:
+            for querypop in [0, 1]:
+                # 跳过 p_worse=0 且 querypop=0 的情况
+                if p_worse == 0 and querypop == 0:
+                    continue
+                
+                test_name = f"B_db{db_size}_len{key_len}_p{p_worse}_q{querypop}"
+                run_test(db_size, key_len, p_worse, querypop, test_name)
+
+def main():
+    """
+    主函数
+    """
+    start_time = datetime.datetime.now()
+    print("开始性能测试")
+    print(f"开始时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"{'#'*80}")
+    
+    # 运行测试套件A
+    test_suite_a()
+    
+    # 运行测试套件B  
+    test_suite_b()
+    
+    end_time = datetime.datetime.now()
+    duration = end_time - start_time
+    
+    print(f"{'#'*80}")
+    print("所有测试完成!")
+    print(f"结束时间: {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"总运行时间: {duration}")
+
+if __name__ == "__main__":
+    main()
