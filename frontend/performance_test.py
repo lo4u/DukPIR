@@ -9,7 +9,7 @@ import time
 import sys
 import os
 
-def run_test(db_size, key_len, p_worse, querypop, test_name, run_count=10):
+def run_test(db_size, key_len, p_worse, querypop, use_ntt, test_name, run_count=10):
     """
     运行单个测试配置
     """
@@ -26,7 +26,8 @@ def run_test(db_size, key_len, p_worse, querypop, test_name, run_count=10):
         
         # 构建命令参数
         cmd = ['./production-app', '-n', str(db_size), '-l', str(key_len), 
-               '-p_worse', str(p_worse), '-querypop', str(querypop)]
+               '-p_worse', str(p_worse), '-querypop', str(querypop),
+               '-use_ntt', str(use_ntt)]
         
         # 执行命令
         try:
@@ -51,6 +52,7 @@ def test_suite_a():
     
     db_sizes = [2**16, 2**17, 2**18, 2**19, 2**20]
     key_len = 1024  # 1KB
+    use_ntt = 0
     
     for db_size in db_sizes:
         for p_worse in [0, 1]:
@@ -60,7 +62,7 @@ def test_suite_a():
                     continue
                 
                 test_name = f"A_db{db_size}_len{key_len}_p{p_worse}_q{querypop}"
-                run_test(db_size, key_len, p_worse, querypop, test_name)
+                run_test(db_size, key_len, p_worse, querypop, use_ntt, test_name)
 
 def test_suite_b():
     """
@@ -74,6 +76,7 @@ def test_suite_b():
         (2**17, 30*1024),  # 128KB数据库，30KB键值  
         (2**14, 100*1024)  # 16KB数据库，100KB键值
     ]
+    use_ntt = 0
     
     for db_size, key_len in test_cases:
         for p_worse in [0, 1]:
@@ -83,7 +86,27 @@ def test_suite_b():
                     continue
                 
                 test_name = f"B_db{db_size}_len{key_len}_p{p_worse}_q{querypop}"
-                run_test(db_size, key_len, p_worse, querypop, test_name)
+                run_test(db_size, key_len, p_worse, querypop, use_ntt, test_name)
+
+def test_suite_ntt():
+    """
+    测试套件ntt: NTT加速预处理测试
+    """
+    print("开始测试套件 NTT")
+    print("NTT加速预处理相关性能测试")
+
+    db_sizes = [2**16, 2**17, 2**18, 2**19, 2**20]
+    key_len = 1024  # 1KB
+    use_ntt = 1
+
+    for db_size in db_sizes:
+        for p_worse in [0, 1]:
+            for querypop in [0, 1]:
+              if p_worse == 0 and querypop == 0:
+                  continue
+
+              test_name = f"NTT_db{db_size}_len{key_len}"
+              run_test(db_size, key_len, p_worse, querypop, use_ntt, test_name)
 
 def main():
     """

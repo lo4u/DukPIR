@@ -3,7 +3,13 @@ package pir
 // #cgo CFLAGS: -O3 -march=native
 // #include "pir.h"
 import "C"
-import "fmt"
+import (
+	"fmt"
+	"math"
+
+	"github.com/tuneinsight/lattigo/v6/ring"
+)
+
 // import "time"
 
 type SimplePIR struct{}
@@ -47,43 +53,43 @@ func (pi *SimplePIR) PickParams(N, d, n, logq uint64) Params {
 func (pi *SimplePIR) PickParamsGivenDimensions(l, m, n, logq uint64) Params {
 	p := Params{
 		N:    n,
-                Logq: logq,
-                L:    l,
-                M:    m,
+		Logq: logq,
+		L:    l,
+		M:    m,
 	}
-        p.PickParams(false, m)
-        return p
+	p.PickParams(false, m)
+	return p
 }
 
 // Works for SimplePIR because vertical concatenation doesn't increase
 // the number of LWE samples (so don't need to change LWE params)
 func (pi *SimplePIR) ConcatDBs(DBs []*Database, p *Params) *Database {
-        if len(DBs) == 0 {
-                panic("Should not happen")
-        }
+	if len(DBs) == 0 {
+		panic("Should not happen")
+	}
 
-        if DBs[0].Info.Num != p.L * p.M {
-                panic("Not yet implemented")
-        }
+	if DBs[0].Info.Num != p.L*p.M {
+		panic("Not yet implemented")
+	}
 
-        rows := DBs[0].Data.Rows
-        for j:=1; j<len(DBs); j++ {
-                if DBs[j].Data.Rows != rows {
-                        panic("Bad input")
-                }
-        }
+	rows := DBs[0].Data.Rows
+	for j := 1; j < len(DBs); j++ {
+		if DBs[j].Data.Rows != rows {
+			panic("Bad input")
+		}
+	}
 
-        D := new(Database)
-        D.Data = MatrixZeros(0, 0)
-        D.Info = DBs[0].Info
-        D.Info.Num *= uint64(len(DBs))
-        p.L *= uint64(len(DBs))
+	D := new(Database)
+	D.Data = MatrixZeros(0, 0)
+	D.Info = DBs[0].Info
+	D.Info.Num *= uint64(len(DBs))
+	p.L *= uint64(len(DBs))
 
-	for j:=0; j<len(DBs); j++ {
+	for j := 0; j < len(DBs); j++ {
 		D.Data.Concat(DBs[j].Data.SelectRows(0, rows))
 	}
 
-        return D
+	return D
 }
 
 func (pi *SimplePIR) GetBW(info DBinfo, p Params) {
@@ -98,19 +104,19 @@ func (pi *SimplePIR) GetBW(info DBinfo, p Params) {
 }
 
 func (pi *SimplePIR) Init(info DBinfo, p Params) State {
-        A := MatrixZeros(p.M, p.N)
-		A.Add(1)
-        return MakeState(A)
+	A := MatrixZeros(p.M, p.N)
+	A.Add(1)
+	return MakeState(A)
 }
 
 func (pi *SimplePIR) InitCompressed(info DBinfo, p Params) (State, CompressedState) {
 	seed := RandomPRGKey()
-	return pi.InitCompressedSeeded(info, p, seed) 
+	return pi.InitCompressedSeeded(info, p, seed)
 }
 
 func (pi *SimplePIR) InitCompressedSeeded(info DBinfo, p Params, seed *PRGKey) (State, CompressedState) {
-        bufPrgReader = NewBufPRG(NewPRG(seed))
-        return pi.Init(info, p), MakeCompressedState(seed)
+	bufPrgReader = NewBufPRG(NewPRG(seed))
+	return pi.Init(info, p), MakeCompressedState(seed)
 }
 
 func (pi *SimplePIR) DecompressState(info DBinfo, p Params, comp CompressedState) State {
@@ -122,6 +128,64 @@ func (pi *SimplePIR) Setup(DB *Database, shared State, p Params) (State, Msg) {
 	A := shared.Data[0]
 	H := MatrixMul(DB.Data, A)
 
+	// map the database entries to [0, p] (rather than [-p/1, p/2]) and then
+	// pack the database more tightly in memory, because the online computation
+	// is memory-bandwidth-bound
+	DB.Data.Add(p.P / 2)
+	DB.Squish()
+
+	return MakeState(), MakeMsg(H)
+}
+
+func (pi *SimplePIR) FakeSetup_NTT(DB *Database, shared State, p Params) (State, Msg) {
+	// A := shared.Data[0]
+	// H := MatrixMul(DB.Data, A)
+
+	A := shared.Data[0]
+	D := DB.Data
+	sqrt_N := D.Rows
+	n := p.N
+	k := uint64(math.Ceil(float64(sqrt_N) / float64(n)))
+
+	r, err := ring.NewRing(int(n), []uint64{(uint64(1) << p.Logq) + 1})
+	if err != nil {
+		panic(err)
+	}
+
+	H := MatrixZeros(sqrt_N, n)
+	H_poly := make([]ring.Poly, sqrt_N)
+	for i := uint64(0); i < sqrt_N; i++ {
+		H_poly[i] = r.NewPoly()
+	}
+
+	for i := uint64(0); i < k; i++ {
+		// 注意这里的D_i是深层拷贝
+		D_i := D.SelectColumns(i*n, n)
+		A_i := A.SelectRows(i*n, 1)
+		p2 := r.NewPoly()
+		p2_ntt := r.NewPoly()
+		for t := uint64(0); t < n; t++ {
+			p2.Coeffs[0][t] = uint64(A_i.Data[t])
+		}
+		r.NTT(p2, p2_ntt)
+
+		for j := uint64(0); j < sqrt_N; j++ {
+			p1 := r.NewPoly()
+			// copy(p1.Coeffs[0], D_i.Data[j])
+			for t := uint64(0); t < n; t++ {
+				p1.Coeffs[0][t] = uint64(D_i.Data[j*n+t])
+			}
+			r.NTT(p1, p1)
+			r.MulCoeffsMontgomeryThenAdd(p1, p2_ntt, H_poly[j])
+		}
+	}
+
+	for i := uint64(0); i < sqrt_N; i++ {
+		r.INTT(H_poly[i], H_poly[i])
+		for t := uint64(0); t < n; t++ {
+			H.Data[i*n+t] = C.Elem(H_poly[i].Coeffs[0][t])
+		}
+	}
 	// map the database entries to [0, p] (rather than [-p/1, p/2]) and then
 	// pack the database more tightly in memory, because the online computation
 	// is memory-bandwidth-bound
@@ -190,13 +254,13 @@ func (pi *SimplePIR) Recover(i uint64, batch_index uint64, offline Msg, query Ms
 	H := offline.Data[0]
 	ans := answer.Data[0]
 
-	ratio := p.P/2
-	offset := uint64(0);
-	for j := uint64(0); j<p.M; j++ {
-        	offset += ratio*query.Data[0].Get(j,0)
+	ratio := p.P / 2
+	offset := uint64(0)
+	for j := uint64(0); j < p.M; j++ {
+		offset += ratio * query.Data[0].Get(j, 0)
 	}
 	offset %= (1 << p.Logq)
-	offset = (1 << p.Logq)-offset
+	offset = (1 << p.Logq) - offset
 
 	row := i / p.M
 	interm := MatrixMul(H, secret)
