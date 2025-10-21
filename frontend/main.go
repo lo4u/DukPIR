@@ -79,10 +79,11 @@ type Config struct {
 }
 
 type ResultInfo struct {
-		dbIdx   int
-		pos     uint64
-		index   uint64
-		value   uint64
+		dbIdx    int
+		pos      uint64
+		ChunkNum uint64
+		index    uint64
+		value    uint64
 	}
 
 func main() {
@@ -94,7 +95,7 @@ func main() {
 	stats.OfflineTime = time.Since(startOffline)
 	if config.QueryKey == "" {
 		// 测试删除和添加功能
-		//testUpdateFunctions(system,stats,config.PWorse, config.KeyLen)
+		// testUpdateFunctions(system,stats,config.PWorse, config.KeyLen)
 	}
 
 	// 运行在线阶段
@@ -110,8 +111,12 @@ func main() {
 		}
 		
 		success, value := ourPIROnline(system, queryKey, config.PWorse, stats)
-		fmt.Printf("Query key: \n")
-		fmt.Printf("Query result: success=%v, value=%s\n", success, value)
+		// fmt.Printf("Query key: %s\n", queryKey)
+		displayValue := value
+		if len(value) > 64 {
+			displayValue = fmt.Sprintf("%s...(length of %d totally)", value[:64], len(value))
+		}
+		fmt.Printf("Query result: success=%v, value=%s\n", success, displayValue)
 	}
 	
 	// 输出性能统计
@@ -294,22 +299,32 @@ func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *
 	bucketPow := filter.GetBucketPow()
 	i1, fp := cf.GetIndexAndFingerprint([]byte(queryKey), bucketPow)
 	i2 := cf.GetAltIndex(fp, i1, bucketPow)
-		
+	
+	displayKey := queryKey
+	if len(queryKey) > 64 {
+		displayKey = queryKey[:64] + "..."
+	}
+	fmt.Printf("Query key: %s(length of %d totally), positions: i1=%d, i2=%d, fp=%d\n", displayKey, len(queryKey) ,i1, i2, fp)
+	
 	// 计算总数据库数量：4个fingerprint DB + 4个value DB
 	totalDBs := 8
 	
-	// 重新设计查询结构：每个数据库每个位置可能有多个查询（每个行一个查询）
+	// 重新设计查询结构
 	type QueryInfo struct {
 		dbIdx    int
 		pos      uint64
+		ChunkNum []uint64
 		query    pir.Msg
 		state    pir.State
-		row      uint64
-		indexes  []uint64 // 该行中包含的目标索引
+		col      uint64
+		indexes  []uint64 // 该列中包含的目标索引
 	}
 	
 	var queryInfos []QueryInfo
 	var wg sync.WaitGroup
+	
+	// 使用互斥锁保护共享数据
+	var queryInfosMutex sync.Mutex
 	
 	// 生成查询 - 统计客户端时间
 	startQuery := time.Now()
@@ -323,19 +338,22 @@ func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *
 				pirDB := databases[dbIdx]
 				clientState, query := pirDB.PIR.Query(pos, pirDB.SharedState, pirDB.Params, pirDB.Info)
 				
+				queryInfosMutex.Lock()
 				queryInfos = append(queryInfos, QueryInfo{
 					dbIdx:   dbIdx,
 					pos:     pos,
+					ChunkNum:[]uint64{0},
 					query:   query,
 					state:   clientState,
-					row:     pos / pirDB.Params.M, // 计算所在行
-					indexes: []uint64{pos},        // 只包含一个目标索引
+					col:     pos % pirDB.Params.M, // 计算所在列
+					indexes: []uint64{pos},
 				})
+				queryInfosMutex.Unlock()
 			}(dbIdx, pos)
 		}
 	}
 	
-	// 处理value数据库（每个位置可能有多个查询，每个行一个查询）
+	// 处理value数据库（按列查询）
 	for dbIdx := 4; dbIdx < totalDBs; dbIdx++ {
 		for _, pos := range []uint64{uint64(i1), uint64(i2)} {
 			wg.Add(1)
@@ -345,31 +363,40 @@ func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *
 				
 				// 计算起始索引
 				startIndex := pos * uint64(system.ValueChunks)
-				
-				// 找出所有包含目标分片的行（去重）
-				rows := make(map[uint64][]uint64) // row -> 该行中的目标索引
+				var realIndex uint64
+
+				// 找出所有包含目标分片的列（去重）
+				cols := make(map[uint64][]uint64) // col -> 该列中的目标索引
+				ChunkNum := make(map[uint64][]uint64) // col -> 该列中的目标索引
 				for chunk := 0; chunk < system.ValueChunks; chunk++ {
 					index := startIndex + uint64(chunk)
-					row := index / pirDB.Params.M
-					rows[row] = append(rows[row], index)
+					// 计算在列优先存储中的列号
+					col := index / (pirDB.Params.L/7)
+					row := index % (pirDB.Params.L/7)
+					realIndex = row * pirDB.Params.M + col
+					cols[col] = append(cols[col], realIndex)
+					ChunkNum[col] = append(ChunkNum[col], uint64(chunk))
 				}
 				
-				// 为每个行生成一个查询
-				for row, indexes := range rows {
-					// 在该行中随机选择一个列
-					randomCol := rand.Intn(int(pirDB.Params.M))
-					queryPos := row*pirDB.Params.M + uint64(randomCol)
+				// 为每个列生成一个查询
+				for col, indexes := range cols {
+					// 在该列中随机选择一个行
+					// randomRow := rand.Intn(int(pirDB.Params.L))
+					queryPos := col 
 					
-					clientState, query := pirDB.PIR.Query(queryPos, pirDB.SharedState, pirDB.Params, pirDB.Info)
+					clientState, query := pirDB.PIR.Query(uint64(queryPos), pirDB.SharedState, pirDB.Params, pirDB.Info)
 					
+					queryInfosMutex.Lock()
 					queryInfos = append(queryInfos, QueryInfo{
 						dbIdx:   dbIdx,
 						pos:     pos,
+						ChunkNum:ChunkNum[col],
 						query:   query,
 						state:   clientState,
-						row:     row,
+						col:     col,
 						indexes: indexes,
 					})
+					queryInfosMutex.Unlock()
 				}
 			}(dbIdx, pos)
 		}
@@ -402,10 +429,11 @@ func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *
 	
 	// 计算应答通信量 (KB)
 	stats.OnlineAnswerComm = calculateMsgSizeKB(answers)
+	stats.OnlineResponseTime = time.Since(startResponse)
 	
 	// 恢复结果 - 对每个分片单独恢复
-	
 	var results []ResultInfo
+	var resultsMutex sync.Mutex
 	
 	for i := range queryInfos {
 		wg.Add(1)
@@ -415,22 +443,24 @@ func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *
 			pirDB := databases[info.dbIdx]
 			
 			// 对于该查询对应的每个目标索引，都进行恢复
-			for _, index := range info.indexes {
+			for offset, index := range info.indexes {
 				result := pirDB.PIR.Recover(index, 0, pirDB.OfflineMsg, 
 					info.query, answers[idx], pirDB.SharedState, 
 					info.state, pirDB.Params, pirDB.Info)
 				
+				resultsMutex.Lock()
 				results = append(results, ResultInfo{
-					dbIdx: info.dbIdx,
-					pos:   info.pos,
-					index: index,
-					value: result,
+					dbIdx:    info.dbIdx,
+					pos:      info.pos,
+					ChunkNum: info.ChunkNum[offset],
+					index:    index,
+					value:    result,
 				})
+				resultsMutex.Unlock()
 			}
 		}(i)
 	}
 	wg.Wait()
-	stats.OnlineResponseTime = time.Since(startResponse)
 	
 	success, recoveredValue := processResultsNew(results, uint32(fp), system.ValueChunks, i1, i2)
 	
@@ -443,7 +473,6 @@ func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *
 	
 	return success, recoveredValue
 }
-
 // convertFilterToDatabases 将cuckoo filter转换为数据库（修改后的版本）
 func convertFilterToDatabases(filter *cf.Filter, valueChunks int) ([]*PIRDatabase, float64) {
 	buckets := filter.GetBuckets()
@@ -508,7 +537,7 @@ func convertFilterToDatabases(filter *cf.Filter, valueChunks int) ([]*PIRDatabas
 		}(slot)
 	}
 	
-	// 并行初始化value数据库 - 每个slot一个value数据库，包含所有value分片
+	// 并行初始化value数据库 - 每个slot一个value数据库，按列优先存储
 	for slot := 0; slot < 4; slot++ {
 		wg.Add(1)
 		go func(slot int) {
@@ -516,47 +545,55 @@ func convertFilterToDatabases(filter *cf.Filter, valueChunks int) ([]*PIRDatabas
 			
 			// 每个value数据库的大小为 numBuckets * valueChunks
 			totalValues := numBuckets * valueChunks
-			valueValues := make([]uint64, totalValues)
 			
+			// 先选择参数
+			pirInst := &pir.SimplePIR{}
+			params := pirInst.PickParams(uint64(totalValues), 64, 1<<10, 32)
+			// params = pirInst.PickParams(uint64(params.L*params.M), 64, 1<<10, 32)
+			// fmt.Printf("\ntotalValues, p.L, p.M: %d, %d, %d\n",uint64(totalValues),params.L/7,params.M)
+			
+			// 创建按列优先存储的数据数组
+			valueValues := make([]uint64, params.L/7*params.M)
+			
+			// 按列优先顺序填充数据
 			for bucketIdx := 0; bucketIdx < numBuckets; bucketIdx++ {
 				linearIndex := bucketIdx*bucketSize + slot
-				if linearIndex < len(values) && values[linearIndex] != "" {
-					// 将value分成多个chunk，每个chunk8字节
-					valueBytes := []byte(values[linearIndex])
+				valueBytes := []byte(values[linearIndex])
+				for chunk := 0; chunk < valueChunks; chunk++ {
+					// 计算原始索引
+					originalIndex := bucketIdx*valueChunks + chunk
 					
-					for chunk := 0; chunk < valueChunks; chunk++ {
-						chunkStart := chunk * 8
-						chunkEnd := chunkStart + 8
-						if chunkEnd > len(valueBytes) {
-							chunkEnd = len(valueBytes)
-						}
-						
-						// 提取当前chunk的字节
-						chunkBytes := make([]byte, 8)
-						if chunkStart < len(valueBytes) {
-							copy(chunkBytes, valueBytes[chunkStart:chunkEnd])
-						}
-						
-						// 将分片存储到连续的位置
-						storageIndex := bucketIdx*valueChunks + chunk
-						if storageIndex < len(valueValues) {
+					// 计算在列优先存储中的位置
+					col := originalIndex / int(params.L/7)  // 列号
+					row := originalIndex % int(params.L/7)  // 行号
+					storageIndex := row*int(params.M) + col
+					
+					if storageIndex < len(valueValues) {
+						if linearIndex < len(values) && values[linearIndex] != "" {
+							// 将value分成多个chunk，每个chunk8字节
+							
+							chunkStart := chunk * 8
+							chunkEnd := chunkStart + 8
+							if chunkEnd > len(valueBytes) {
+								chunkEnd = len(valueBytes)
+							}
+							
+							// 提取当前chunk的字节
+							chunkBytes := make([]byte, 8)
+							if chunkStart < len(valueBytes) {
+								copy(chunkBytes, valueBytes[chunkStart:chunkEnd])
+							}
+							
 							valueValues[storageIndex] = binary.BigEndian.Uint64(chunkBytes)
-						}
-					}
-				} else {
-					// 没有value，所有分片设为0
-					for chunk := 0; chunk < valueChunks; chunk++ {
-						storageIndex := bucketIdx*valueChunks + chunk
-						if storageIndex < len(valueValues) {
+						} else {
 							valueValues[storageIndex] = 0
 						}
 					}
 				}
 			}
 			
-			pirInst := &pir.SimplePIR{}
-			params := pirInst.PickParams(uint64(totalValues), 64, 1<<10, 32)
-			db := pir.MakeDB(uint64(totalValues), 64, &params, valueValues)
+			// 用填充好的数据创建数据库
+			db := pir.MakeDB(uint64(params.L/7*params.M), 64, &params, valueValues)
 			
 			sharedState := pirInst.Init(db.Info, params)
 			serverState, offlineMsg := pirInst.Setup(db, sharedState, params)
@@ -604,7 +641,7 @@ func convertFilterToDatabases(filter *cf.Filter, valueChunks int) ([]*PIRDatabas
 }
 
 // processResultsNew 新的处理查询结果函数
-func processResultsNew(results []ResultInfo, fp uint32, valueChunks int, i1,i2 uint) (bool, string) {
+func processResultsNew(results []ResultInfo, fp uint32, valueChunks int, i1, i2 uint) (bool, string) {
 	fingerprintMatches := 0
 	matchedSlot := -1
 	
@@ -633,6 +670,7 @@ func processResultsNew(results []ResultInfo, fp uint32, valueChunks int, i1,i2 u
 	}
 	
 	if fingerprintMatches == 1 && matchedSlot != -1 {
+		fmt.Printf("get_key\n")
 		// 找到匹配的slot，从对应的value数据库恢复完整value
 		valueDBIndex := 4 + matchedSlot
 		
@@ -644,8 +682,8 @@ func processResultsNew(results []ResultInfo, fp uint32, valueChunks int, i1,i2 u
 					valueChunksMap[result.pos] = make(map[uint64]uint64)
 				}
 				// 计算分片索引
-				startIndex := result.pos * uint64(valueChunks)
-				chunkIndex := result.index - startIndex
+				chunkIndex := result.ChunkNum
+				// fmt.Printf("chunkIndex,result.value : %d, %d\n",chunkIndex,result.value)
 				valueChunksMap[result.pos][chunkIndex] = result.value
 			}
 		}
@@ -659,8 +697,7 @@ func processResultsNew(results []ResultInfo, fp uint32, valueChunks int, i1,i2 u
 			// 使用i2位置的结果
 			valueBytes = recoverValueFromChunks(chunks, valueChunks)
 		} else {
-			valueBytes = recoverValueFromChunks(chunks, valueChunks)
-			// return false, ""
+			return false, ""
 		}
 		
 		// 去除尾部的零字节
@@ -693,7 +730,7 @@ func recoverValueFromChunks(chunks map[uint64]uint64, valueChunks int) []byte {
 	return valueBytes
 }
 
-
+// 计算Msg的大小（MB）- 用于离线通信量
 func calculateMsgSize(msgs []pir.Msg) float64 {
 	totalBytes := 0.0
 	for _, msg := range msgs {
@@ -749,7 +786,13 @@ func calculateMsgSliceSizeKB(msgSlices []pir.MsgSlice) float64 {
 	return totalBytes / 1024.0 // 转换为KB
 }
 
-// 数据库操作函数
+// 原有的processResults函数（保留用于兼容性）
+func processResults(results []uint64, fp uint32, valueChunks int) (bool, string) {
+	// 这个函数在新的实现中不再使用，但为了代码完整性保留
+	return false, ""
+}
+
+// 数据库操作函数（保持不变）
 func readDBFromFile(filePath string) DB {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -1390,4 +1433,15 @@ func testUpdateFunctions(system *OurPIRSystem,  stats *PerformanceStats, p_worse
     success, value = ourPIROnline(system, testKey, p_worse, &PerformanceStats{})
     fmt.Printf("Query after deletion: success=%v, value=%s\n\n", success, value)
 
+}
+
+func RowMajorToColMajor(m, n, i, j uint64) (r, c uint64) {
+    // 计算在行优先中的线性索引（从0开始）
+    linearIndex := i*n + j 
+    
+    // 转换为列优先坐标
+    r = linearIndex%m 
+    c = linearIndex/m 
+    
+    return r, c
 }
