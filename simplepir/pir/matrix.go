@@ -408,12 +408,12 @@ func (m *Matrix) SelectColumns(offset, num_cols uint64) *Matrix {
 		return m
 	}
 
-	if offset > m.Rows {
+	if offset > m.Cols {
 		panic("Asking for bad offset")
 	}
 
 	if offset+num_cols <= m.Cols {
-		m2 := MatrixNewNoAlloc(m.Rows, num_cols)
+		m2 := MatrixNew(m.Rows, num_cols)
 		for i := uint64(0); i < m.Rows; i++ {
 			copy(m2.Data[i*num_cols:(i+1)*num_cols], m.Data[i*m.Cols+offset:i*m.Cols+offset+num_cols])
 		}
@@ -421,12 +421,12 @@ func (m *Matrix) SelectColumns(offset, num_cols uint64) *Matrix {
 	}
 
 	num_cols = m.Cols - offset
-	m2 := MatrixNewNoAlloc(m.Rows, num_cols)
+	m2 := MatrixNew(m.Rows, num_cols)
 	for i := uint64(0); i < m.Rows; i++ {
 		copy(m2.Data[i*num_cols:(i+1)*num_cols], m.Data[i*m.Cols+offset:(i+1)*m.Cols])
 	}
 
-	return m2 // should not happen
+	return m2
 }
 
 func (m *Matrix) SelectRows(offset, num_rows uint64) *Matrix {

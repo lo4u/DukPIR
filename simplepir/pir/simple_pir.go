@@ -147,7 +147,7 @@ func (pi *SimplePIR) FakeSetup_NTT(DB *Database, shared State, p Params) (State,
 	n := p.N
 	k := uint64(math.Ceil(float64(sqrt_N) / float64(n)))
 
-	r, err := ring.NewRing(int(n), []uint64{(uint64(1) << p.Logq) + 1})
+	r, err := ring.NewRing(int(n), []uint64{4293918721})
 	if err != nil {
 		panic(err)
 	}
@@ -159,9 +159,17 @@ func (pi *SimplePIR) FakeSetup_NTT(DB *Database, shared State, p Params) (State,
 	}
 
 	for i := uint64(0); i < k; i++ {
-		// 注意这里的D_i是深层拷贝
-		D_i := D.SelectColumns(i*n, n)
-		A_i := A.SelectRows(i*n, 1)
+		var D_i *Matrix
+		var A_i *Matrix
+		if i < k-1 {
+			// 注意这里的D_i是深层拷贝
+			D_i = D.SelectColumns(i*n, n)
+			A_i = A.SelectRows(i*n, 1)
+		} else {
+			D_i = MatrixRand(n, n, 10, 0)
+			A_i = MatrixRand(n, n, 32, 0)
+		}
+
 		p2 := r.NewPoly()
 		p2_ntt := r.NewPoly()
 		for t := uint64(0); t < n; t++ {

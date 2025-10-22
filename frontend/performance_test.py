@@ -118,10 +118,13 @@ def main():
     print(f"{'#'*80}")
     
     # 运行测试套件A
-    test_suite_a()
+    # test_suite_()
     
     # 运行测试套件B  
-    test_suite_b()
+    # test_suite_b()
+
+    # 运行测试套件NTT
+    test_suite_ntt()
     
     end_time = datetime.datetime.now()
     duration = end_time - start_time
