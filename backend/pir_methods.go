@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
+
 	pir "github.com/ahenzinger/simplepir/pir"
 	cf "github.com/seiflotfy/cuckoofilter"
 )
@@ -373,11 +374,12 @@ func (system *OurPIRSystem) UpdateValue(key, newValue string) error {
 // updateValueInFilterAndDatabase 在指定filter和数据库中更新值
 func (system *OurPIRSystem) updateValueInFilterAndDatabase(filter *cf.Filter, databases []*PIRDatabase, key, newValue string) error {
 	// 检查key是否存在
+
 	found, _ := filter.LookupValue([]byte(key))
 	if !found {
 		return fmt.Errorf("key does not exist: %s", key)
 	}
-
+	fmt.Println("11111111111111")
 	// 更新filter中的值
 	success := filter.SetValue([]byte(key), newValue)
 	if !success {

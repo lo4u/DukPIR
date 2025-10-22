@@ -7,19 +7,21 @@ import {
   Table, 
   message, 
   Space,
-  Statistic,
   Row,
   Col,
   Tag,
   Typography,
-  Divider
+  Divider,
+  Popconfirm,
+  Statistic
 } from 'antd';
 import {
   SearchOutlined,
   LogoutOutlined,
   DatabaseOutlined,
   ClockCircleOutlined,
-  CloudUploadOutlined
+  CloudUploadOutlined,
+  ClearOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { userAPI } from '../services/api';
@@ -30,36 +32,38 @@ const { Title, Text } = Typography;
 const UserDashboard = () => {
   const [queryKey, setQueryKey] = useState('');
   const [queryResult, setQueryResult] = useState(null);
+  const [showResult, setShowResult] = useState(false);
+  const [queryError, setQueryError] = useState(null);
   const [queryHistory, setQueryHistory] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState(null);
   const { user, logout } = useAuth();
 
   useEffect(() => {
-    loadStats();
     loadQueryHistory();
   }, []);
 
-  const loadStats = async () => {
-    try {
-      const response = await userAPI.getStats();
-      setStats(response);
-    } catch (error) {
-      console.error('加载统计信息失败:', error);
-    }
-  };
-
   const loadQueryHistory = () => {
-    // 从本地存储加载查询历史
     const history = JSON.parse(localStorage.getItem('queryHistory') || '[]');
     setQueryHistory(history);
   };
 
-  const saveQueryHistory = (query) => {
+  const saveQueryHistory = (query, status, errorMsg = null) => {  // 修改：添加 errorMsg 用于显示
     const history = JSON.parse(localStorage.getItem('queryHistory') || '[]');
-    const newHistory = [query, ...history.slice(0, 9)]; // 保留最近10条
+    const newHistory = [{ 
+      key: query, 
+      status, 
+      error: errorMsg || null,  // 新增：保存错误消息，便于历史显示
+      timestamp: new Date().toISOString() 
+    }, ...history.slice(0, 9)];
     localStorage.setItem('queryHistory', JSON.stringify(newHistory));
     setQueryHistory(newHistory);
+  };
+
+  const deleteHistoryItem = (index) => {
+    const newHistory = queryHistory.filter((_, i) => i !== index);
+    localStorage.setItem('queryHistory', JSON.stringify(newHistory));
+    setQueryHistory(newHistory);
+    message.success('删除成功');
   };
 
   const handleQuery = async () => {
@@ -69,27 +73,53 @@ const UserDashboard = () => {
     }
 
     setLoading(true);
+    setQueryError(null);
+    setShowResult(false);
     try {
       const response = await userAPI.query(queryKey.trim());
-      setQueryResult(response);
       
-      // 保存查询历史
-      saveQueryHistory({
-        key: queryKey.trim(),
-        result: response,
-        timestamp: new Date().toISOString()
-      });
+      const valueResult = response.value?.value || 
+                         response.results?.[0]?.value || 
+                         response.value || 
+                         response.results || 
+                         null;
       
-      if (response.success) {
-        message.success('查询成功');
-      } else {
-        message.warning('未找到匹配的数据');
+      // 【核心修复】：检查业务 success，如果 false，视为错误
+      if (response.success === false) {
+        const errorMsg = response.message || '未找到匹配的数据';  // 从后端提取消息，fallback 到默认
+        setQueryError(errorMsg);
+        setQueryResult(null);  // 清空结果
+        setShowResult(true);
+        saveQueryHistory(queryKey.trim(), false, errorMsg);  // 保存失败历史
+        message.warning(errorMsg);  // 用 warning 显示业务警告
+        setLoading(false);
+        return;  // 提前返回，避免后续成功逻辑
       }
+      
+      // 成功路径
+      setQueryResult(valueResult);
+      setShowResult(true);
+      saveQueryHistory(queryKey.trim(), true);  // 成功，无 errorMsg
+      message.success('查询成功');
     } catch (error) {
-      message.error('查询失败');
+      // 网络/异常错误
+      const errorMsg = error.response?.data?.message || error.message || '查询失败';
+      setQueryError(errorMsg);
+      setQueryResult(null);
+      setShowResult(true);
+      saveQueryHistory(queryKey.trim(), false, errorMsg);
+      message.error(errorMsg);  // 用 error 显示异常
       console.error('查询错误:', error);
     }
     setLoading(false);
+  };
+
+  const handleClear = () => {
+    setQueryKey('');
+    setQueryResult(null);
+    setQueryError(null);
+    setShowResult(false);
+    message.info('已清除查询');
   };
 
   const handleKeyPress = (e) => {
@@ -98,6 +128,7 @@ const UserDashboard = () => {
     }
   };
 
+  // 修改：历史列，状态显示 error，如果有
   const historyColumns = [
     {
       title: '查询关键字',
@@ -105,20 +136,15 @@ const UserDashboard = () => {
       key: 'key',
     },
     {
-      title: '查询结果',
-      dataIndex: 'result',
-      key: 'result',
-      render: (result) => (
-        <Tag color={result?.success ? 'green' : 'red'}>
-          {result?.success ? '成功' : '失败'}
+      title: '查询状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 120,
+      render: (status, record) => (
+        <Tag color={status ? 'green' : 'red'}>
+          {status ? '成功' : (record.error || '失败/未匹配')}
         </Tag>
       ),
-    },
-    {
-      title: '返回值',
-      dataIndex: 'result',
-      key: 'value',
-      render: (result) => result?.value || '-',
     },
     {
       title: '查询时间',
@@ -126,7 +152,35 @@ const UserDashboard = () => {
       key: 'timestamp',
       render: (timestamp) => new Date(timestamp).toLocaleString(),
     },
+    {
+      title: '操作',
+      key: 'action',
+      width: 80,
+      render: (_, __, index) => (
+        <Popconfirm
+          title="确定删除此记录？"
+          onConfirm={() => deleteHistoryItem(index)}
+          okText="删除"
+          cancelText="取消"
+        >
+          <Button type="link" size="small" danger>删除</Button>
+        </Popconfirm>
+      ),
+    },
   ];
+
+  // 辅助函数：格式化结果显示（微调：失败时不显示详细结果）
+  const formatResult = (result) => {
+    if (result === null || result === undefined) return <Text type="secondary">-</Text>;
+    if (typeof result === 'object') {
+      const { stats, ...displayResult } = result;
+      return <pre style={{ background: '#f5f5f5', padding: 8, borderRadius: 4, fontSize: '12px', maxHeight: 200, overflow: 'auto' }}>{JSON.stringify(displayResult, null, 2)}</pre>;
+    }
+    return result;
+  };
+
+  // 判断是否显示 stats（只在成功且有 stats 时）
+  const hasValidResult = !queryError && queryResult !== null && queryResult !== undefined;
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -161,6 +215,7 @@ const UserDashboard = () => {
               value={queryKey}
               onChange={(e) => setQueryKey(e.target.value)}
               onKeyPress={handleKeyPress}
+              suffix={<SearchOutlined />}
               style={{ flex: 1 }}
             />
             <Button 
@@ -171,11 +226,18 @@ const UserDashboard = () => {
             >
               查询
             </Button>
+            <Button 
+              icon={<ClearOutlined />}
+              onClick={handleClear}
+              disabled={loading}
+            >
+              清除
+            </Button>
           </Space.Compact>
           
-          {queryResult && (
+          {showResult && (
             <Card 
-              title="查询结果" 
+              title={queryError ? "查询失败" : "查询结果"} 
               size="small"
               style={{ marginTop: 16 }}
             >
@@ -183,19 +245,38 @@ const UserDashboard = () => {
                 <Col span={12}>
                   <Statistic
                     title="查询状态"
-                    value={queryResult.success ? '成功' : '失败'}
-                    valueStyle={{ color: queryResult.success ? '#3f8600' : '#cf1322' }}
+                    value={queryError ? '失败' : '成功'}
+                    valueStyle={{ color: queryError ? '#cf1322' : '#3f8600' }}
                   />
                 </Col>
                 <Col span={12}>
                   <Statistic
                     title="返回值"
-                    value={queryResult.value || '-'}
+                    value={hasValidResult && typeof queryResult === 'string' ? queryResult : '-'}
                   />
                 </Col>
               </Row>
               
-              {queryResult.stats && (
+              {/* 详细结果显示：只在成功时 */}
+              {hasValidResult && (
+                <>
+                  <Divider />
+                  <Text strong>详细结果：</Text>
+                  {formatResult(queryResult)}
+                </>
+              )}
+              
+              {/* 错误显示 */}
+              {queryError && (
+                <div style={{ marginTop: 16 }}>
+                  <Text type="danger" style={{ fontSize: '16px', display: 'block', textAlign: 'center' }}>
+                    {queryError}
+                  </Text>
+                </div>
+              )}
+              
+              {/* Stats：只在成功且有 stats 时显示 */}
+              {hasValidResult && queryResult?.stats && (
                 <>
                   <Divider />
                   <Row gutter={16}>
@@ -229,34 +310,6 @@ const UserDashboard = () => {
             </Card>
           )}
         </Card>
-
-        {/* 统计信息 */}
-        {stats && (
-          <Card title="系统统计" style={{ marginBottom: 24 }}>
-            <Row gutter={16}>
-              <Col span={6}>
-                <Statistic title="总记录数" value={stats.records_count || 0} />
-              </Col>
-              <Col span={6}>
-                <Statistic title="用户数量" value={stats.users_count || 0} />
-              </Col>
-              <Col span={6}>
-                <Statistic 
-                  title="离线时间" 
-                  value={stats.performance_stats?.offline_time || 0} 
-                  suffix="ms" 
-                />
-              </Col>
-              <Col span={6}>
-                <Statistic 
-                  title="在线时间" 
-                  value={stats.performance_stats?.online_time || 0} 
-                  suffix="ms" 
-                />
-              </Col>
-            </Row>
-          </Card>
-        )}
 
         {/* 查询历史 */}
         <Card title="查询历史">

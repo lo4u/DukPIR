@@ -85,7 +85,7 @@ func (ps *PIRService) InitializePIRSystem(config Config) error {
 	startOffline := time.Now()
 	system, stats := ps.ourPIROffline(config)
 	stats.OfflineTime = time.Since(startOffline)
-	
+
 	ps.system = system
 	ps.stats = stats
 
@@ -98,6 +98,7 @@ func (ps *PIRService) InitializePIRSystem(config Config) error {
 // Query 执行PIR查询
 func (ps *PIRService) Query(queryKey string, pWorse float64) (bool, string, *PerformanceStats) {
 	ps.mutex.RLock()
+	fmt.Println("33333333333333333333333333333333333")
 	defer ps.mutex.RUnlock()
 
 	if ps.system == nil {
@@ -171,13 +172,26 @@ func (ps *PIRService) GetStats() *PerformanceStats {
 
 // ourPIROffline 实现离线阶段
 func (ps *PIRService) ourPIROffline(config Config) (*OurPIRSystem, *PerformanceStats) {
+	fmt.Println("ourPIROffline function is called")
 	stats := &PerformanceStats{}
 
 	var db DB
+
+	config.FilePath = "./data/records.txt"
 	if config.FilePath != "" {
+		fmt.Printf("尝试从文件读取: %s\n", config.FilePath)
+		// 检查文件是否存在
+		if _, err := os.Stat(config.FilePath); os.IsNotExist(err) {
+			fmt.Printf("文件不存在: %s\n", config.FilePath)
+		} else {
+			fmt.Printf("文件存在，准备读取\n")
+		}
 		db = ps.readDBFromFile(config.FilePath)
+
 	} else {
+		fmt.Printf("文件路径为空，使用随机生成\n")
 		db = ps.generateRandomDB(config.NumRows, config.KeyLen)
+		fmt.Println("没有成功捏")
 	}
 
 	fmt.Printf("总记录数: %d\n", len(db.Records))
@@ -276,7 +290,6 @@ func (ps *PIRService) ourPIROffline(config Config) (*OurPIRSystem, *PerformanceS
 // ourPIROnline 实现在线阶段
 func (ps *PIRService) ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *PerformanceStats) (bool, string) {
 	useFull := rand.Float64() < pWorse
-
 	var databases []*PIRDatabase
 	var filter *cf.Filter
 
@@ -292,12 +305,18 @@ func (ps *PIRService) ourPIROnline(system *OurPIRSystem, queryKey string, pWorse
 
 	// 验证key是否存在
 	found, actualValue := filter.LookupValue([]byte(queryKey))
+	fmt.Println("key:", queryKey)
+	fmt.Printf("Filter Lookup for key %s: found=%v, value=%s\n", queryKey, found, actualValue)
+	fmt.Println()
+	bucketPow02 := filter.GetBuckets()
+	fmt.Println("4444444444", len(bucketPow02))
 	if !found {
 		fmt.Printf("警告: Key %s 在选定数据库中未找到\n", queryKey)
 		return false, ""
 	}
 
 	// 获取位置
+
 	bucketPow := filter.GetBucketPow()
 	i1, fp := cf.GetIndexAndFingerprint([]byte(queryKey), bucketPow)
 	i2 := cf.GetAltIndex(fp, i1, bucketPow)
@@ -535,7 +554,7 @@ func (ps *PIRService) convertFilterToDatabases(filter *cf.Filter, valueChunks in
 func (ps *PIRService) processResults(results []uint64, fp uint32, valueChunks int) (bool, string) {
 	fingerprintMatches := 0
 	matchedValueChunks := make([][]byte, 4) // 每个slot的value chunks
-
+	fmt.Printf("ProcessResults: fp=%d, valueChunks=%d, results len=%d\n", fp, valueChunks, len(results))
 	for i := 0; i < 4; i++ {
 		pos1Result := results[i*2]
 		pos2Result := results[i*2+1]

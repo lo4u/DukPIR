@@ -26,7 +26,8 @@ const LoginPage = () => {
 
   const handleRegister = async (values) => {
     setLoading(true);
-    const result = await register(values.username, values.password, values.role);
+    // 修复：传默认 role: "user"（后端期望第三个参数）
+    const result = await register(values.username, values.password, "user");
     setLoading(false);
     
     if (result.success) {
@@ -37,13 +38,22 @@ const LoginPage = () => {
     }
   };
 
+  // 确认密码验证函数
+  const passwordValidator = (_, value) => {
+    const password = registerForm.getFieldValue('password');
+    if (!value || value === password) {
+      return Promise.resolve();
+    }
+    return Promise.reject(new Error('两次密码不一致'));
+  };
+
   return (
     <div style={{ 
       minHeight: '100vh', 
       display: 'flex', 
       alignItems: 'center', 
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', // 占位符背景
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
       padding: '20px'
     }}>
       <Card 
@@ -80,6 +90,7 @@ const LoginPage = () => {
                     <Input 
                       prefix={<UserOutlined />} 
                       placeholder="用户名" 
+                      style={{ width: '100%' }}
                     />
                   </Form.Item>
                   
@@ -90,6 +101,7 @@ const LoginPage = () => {
                     <Input.Password 
                       prefix={<LockOutlined />} 
                       placeholder="密码" 
+                      style={{ width: '100%' }}
                     />
                   </Form.Item>
                   
@@ -129,25 +141,36 @@ const LoginPage = () => {
                     <Input 
                       prefix={<UserOutlined />} 
                       placeholder="用户名" 
+                      style={{ width: '100%' }}
                     />
                   </Form.Item>
                   
                   <Form.Item
                     name="password"
-                    rules={[{ required: true, message: '请输入密码' }]}
+                    rules={[
+                      { required: true, message: '请输入密码' },
+                      { min: 6, message: '密码至少6位' }
+                    ]}
                   >
                     <Input.Password 
                       prefix={<LockOutlined />} 
                       placeholder="密码" 
+                      style={{ width: '100%' }}
                     />
                   </Form.Item>
                   
                   <Form.Item
-                    name="role"
-                    rules={[{ required: true, message: '请选择角色' }]}
-                    initialValue="user"
+                    name="confirmPassword"
+                    rules={[
+                      { required: true, message: '请确认密码' },
+                      { validator: passwordValidator }
+                    ]}
                   >
-                    <Input placeholder="角色 (admin/user)" />
+                    <Input.Password 
+                      prefix={<LockOutlined />} 
+                      placeholder="确认密码" 
+                      style={{ width: '100%' }}
+                    />
                   </Form.Item>
                   
                   <Form.Item>

@@ -1,9 +1,13 @@
 #!/bin/bash
 
 # PIR后端服务启动脚本
-
 echo "=== PIR后端服务启动脚本 ==="
 echo
+
+# 解决 Windows MinGW 兼容性问题 (保持默认启用 CGO，因为项目需要它)
+# 注意：在 Linux 上，我们不需要设置 CGO_ENABLED，它默认启用。
+# 如果你想使用国内代理，请在运行脚本前执行：export GOPROXY=https://www.google.com/search?q=https://mirrors.aliyun.com/goproxy/
+
 
 # 检查Go是否安装
 if ! command -v go &> /dev/null; then
@@ -44,6 +48,7 @@ fi
 
 # 检查代码语法
 echo "检查代码语法..."
+# 使用 go build . 来编译整个包，而不是单个文件
 go build -o /tmp/pir-backend-test .
 if [ $? -ne 0 ]; then
     echo "错误: 代码编译失败，请检查语法错误"
@@ -62,20 +67,24 @@ NUM_ROWS=${6:-1000}
 KEY_LEN=${7:-10}
 
 echo "启动参数:"
-echo "  端口: $PORT"
-echo "  数据目录: $DATA_DIR"
-echo "  数据库文件: ${DB_FILE:-"未指定（将生成随机数据库）"}"
-echo "  运行模式: $MODE"
-echo "  初始化数据库: $INIT_DB"
-echo "  记录数: $NUM_ROWS"
-echo "  键长度: $KEY_LEN"
+echo "  端口: $PORT"
+echo "  数据目录: $DATA_DIR"
+echo "  数据库文件: ${DB_FILE:-"未指定（将生成随机数据库）"}"
+echo "  运行模式: $MODE"
+echo "  初始化数据库: $INIT_DB"
+echo "  记录数: $NUM_ROWS"
+echo "  键长度: $KEY_LEN"
 echo
 
 # 创建数据目录
+
 mkdir -p "$DATA_DIR"
 
-# 构建启动命令
-CMD="go run main.go -port $PORT -data $DATA_DIR -mode $MODE"
+# ******************************************************************
+# ** 最终修复：使用 go run . 运行当前目录整个 Package **
+# ******************************************************************
+# 将 go run main.go ... 替换为 go run . ...
+CMD="go run . -port $PORT -data $DATA_DIR -mode $MODE"
 
 # 添加数据库文件参数（如果指定）
 if [ -n "$DB_FILE" ]; then
@@ -92,15 +101,14 @@ echo
 
 # 启动服务
 echo "正在启动PIR后端服务..."
+
+# 确保在执行前 CGO_CFLAGS 没有干扰
 exec $CMD
 
 # 使用说明（这行不会执行，因为上面有exec）
 echo "使用说明:"
-echo "  ./start.sh [端口] [数据目录] [数据库文件] [模式] [初始化] [记录数] [键长度]"
-echo "  示例:"
-echo "    ./start.sh 8080 ./data \"\" debug false 1000 10  # 自动生成随机数据库"
-echo "    ./start.sh 8080 ./data database.txt debug false  # 使用指定数据库文件"
-echo "    ./start.sh 8080 ./data \"\" debug true 500 8     # 强制初始化随机数据库"
-
-# 上面那样会报错，请使用下面这条执行，如有必要，处理一下报错的原因。
-go run main.go auth.go handlers.go pir_service.go pir_methods.go storage.go -port 8080 -data ./data -mode debug
+echo "  ./start.sh [端口] [数据目录] [数据库文件] [模式] [初始化] [记录数] [键长度]"
+echo "  示例:"
+echo "    ./start.sh 8080 ./data "" debug false 1000 10  # 自动生成随机数据库"
+echo "    ./start.sh 8080 ./data database.txt debug false  # 使用指定数据库文件"
+echo "    ./start.sh 8080 ./data "" debug true 500 8     # 强制初始化随机数据库"

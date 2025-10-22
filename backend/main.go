@@ -26,13 +26,13 @@ type Config struct {
 func main() {
 	// 命令行参数
 	var (
-		port     = flag.String("port", "8080", "服务器端口")
-		dataDir  = flag.String("data", "./data", "数据存储目录")
-		dbFile   = flag.String("db", "", "数据库文件路径（可选，不指定则生成随机数据库）")
-		mode     = flag.String("mode", "debug", "运行模式: debug, release")
-		initDB   = flag.Bool("init", false, "初始化PIR数据库")
-		numRows  = flag.Int("n", 1000, "初始化时生成的记录数")
-		keyLen   = flag.Int("l", 10, "初始化时生成的键值长度")
+		port    = flag.String("port", "8080", "服务器端口")
+		dataDir = flag.String("data", "./data", "数据存储目录")
+		dbFile  = flag.String("db", "", "数据库文件路径（可选，不指定则生成随机数据库）")
+		mode    = flag.String("mode", "debug", "运行模式: debug, release")
+		// initDB  = flag.Bool("init", false, "初始化PIR数据库")
+		numRows = flag.Int("n", 1000, "初始化时生成的记录数")
+		keyLen  = flag.Int("l", 10, "初始化时生成的键值长度")
 	)
 	flag.Parse()
 
@@ -56,11 +56,11 @@ func main() {
 	apiHandler := NewAPIHandler(authService, pirService, dataStorage)
 
 	// 初始化PIR系统
-	shouldInitDB := *initDB || *dbFile == ""
-	
+	shouldInitDB := true
+
 	if shouldInitDB {
 		fmt.Println("正在初始化PIR系统...")
-		
+
 		// 检查是否有数据库文件
 		if *dbFile != "" {
 			// 使用指定的数据库文件
@@ -73,7 +73,7 @@ func main() {
 				PWorse:    0.1,
 				UseNTT:    1,
 			}
-			
+
 			if err := pirService.InitializePIRSystem(config); err != nil {
 				log.Fatalf("PIR系统初始化失败: %v", err)
 			}
@@ -89,7 +89,7 @@ func main() {
 				PWorse:    0.1,
 				UseNTT:    1,
 			}
-			
+
 			if err := pirService.InitializePIRSystem(config); err != nil {
 				log.Fatalf("PIR系统初始化失败: %v", err)
 			}
@@ -105,12 +105,12 @@ func main() {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization")
-		
+
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
 			return
 		}
-		
+
 		c.Next()
 	})
 
@@ -142,11 +142,11 @@ func main() {
 		admin.DELETE("/records/:key", apiHandler.DeleteRecord)
 		admin.GET("/records", apiHandler.GetAllRecords)
 		admin.GET("/records/:key", apiHandler.GetRecord)
-		
+
 		// 用户管理
 		admin.GET("/users", apiHandler.GetAllUsers)
 		admin.DELETE("/users/:username", apiHandler.DeleteUser)
-		
+
 		// 系统管理
 		admin.POST("/backup", apiHandler.BackupData)
 		admin.POST("/config/p-worse", apiHandler.SetPWorse)
@@ -166,7 +166,7 @@ func main() {
 	fmt.Printf("PIR后端服务启动在端口 %s\n", *port)
 	fmt.Printf("数据目录: %s\n", *dataDir)
 	fmt.Printf("运行模式: %s\n", *mode)
-	
+
 	if shouldInitDB {
 		if *dbFile != "" {
 			fmt.Printf("已初始化PIR数据库，使用文件: %s\n", *dbFile)
