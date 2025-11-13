@@ -4,7 +4,7 @@
 
 ```bash
 git clone https://github.com/lo4u/ddpir
-cd frontend
+cd /src/ddpir
 go mod init ddpir
 go get github.com/seiflotfy/cuckoofilter
 go get github.com/ahenzinger/simplepir

@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "@ant-design/icons": "^6.1.0",
+    "antd": "^4.24.16"
+  },
+  "devDependencies": {
+    "less": "^4.4.2",
+    "less-loader": "^12.3.0"
+  }
+}
