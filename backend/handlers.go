@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -420,7 +419,6 @@ func (h *APIHandler) GetPWorse(c *gin.Context) {
 // Query 查询数据
 func (h *APIHandler) Query(c *gin.Context) {
 	var req QueryRequest
-	fmt.Print("2222222222222222222222")
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误"})
 		return

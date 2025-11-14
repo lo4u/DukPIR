@@ -98,7 +98,6 @@ func (ps *PIRService) InitializePIRSystem(config Config) error {
 // Query 执行PIR查询
 func (ps *PIRService) Query(queryKey string, pWorse float64) (bool, string, *PerformanceStats) {
 	ps.mutex.RLock()
-	fmt.Println("33333333333333333333333333333333333")
 	defer ps.mutex.RUnlock()
 
 	if ps.system == nil {
@@ -177,7 +176,6 @@ func (ps *PIRService) ourPIROffline(config Config) (*OurPIRSystem, *PerformanceS
 
 	var db DB
 
-	config.FilePath = "./data/records.txt"
 	if config.FilePath != "" {
 		fmt.Printf("尝试从文件读取: %s\n", config.FilePath)
 		// 检查文件是否存在
@@ -308,15 +306,12 @@ func (ps *PIRService) ourPIROnline(system *OurPIRSystem, queryKey string, pWorse
 	fmt.Println("key:", queryKey)
 	fmt.Printf("Filter Lookup for key %s: found=%v, value=%s\n", queryKey, found, actualValue)
 	fmt.Println()
-	bucketPow02 := filter.GetBuckets()
-	fmt.Println("4444444444", len(bucketPow02))
 	if !found {
 		fmt.Printf("警告: Key %s 在选定数据库中未找到\n", queryKey)
 		return false, ""
 	}
-
+	
 	// 获取位置
-
 	bucketPow := filter.GetBucketPow()
 	i1, fp := cf.GetIndexAndFingerprint([]byte(queryKey), bucketPow)
 	i2 := cf.GetAltIndex(fp, i1, bucketPow)

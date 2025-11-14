@@ -10,9 +10,9 @@ require (
 	golang.org/x/crypto v0.15.0
 )
 
-replace github.com/ahenzinger/simplepir => ../simplepir
+replace github.com/ahenzinger/simplepir => ../src/simplepir
 
-replace github.com/seiflotfy/cuckoofilter => ../cuckoofilter
+replace github.com/seiflotfy/cuckoofilter => ../src/cuckoofilter
 
 require (
 	github.com/bytedance/sonic v1.9.1 // indirect

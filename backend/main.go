@@ -30,7 +30,6 @@ func main() {
 		dataDir = flag.String("data", "./data", "数据存储目录")
 		dbFile  = flag.String("db", "", "数据库文件路径（可选，不指定则生成随机数据库）")
 		mode    = flag.String("mode", "debug", "运行模式: debug, release")
-		// initDB  = flag.Bool("init", false, "初始化PIR数据库")
 		numRows = flag.Int("n", 1000, "初始化时生成的记录数")
 		keyLen  = flag.Int("l", 10, "初始化时生成的键值长度")
 	)
