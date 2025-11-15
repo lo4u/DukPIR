@@ -171,7 +171,6 @@ func (ps *PIRService) GetStats() *PerformanceStats {
 
 // ourPIROffline 实现离线阶段
 func (ps *PIRService) ourPIROffline(config Config) (*OurPIRSystem, *PerformanceStats) {
-	fmt.Println("ourPIROffline function is called")
 	stats := &PerformanceStats{}
 
 	var db DB
@@ -185,6 +184,7 @@ func (ps *PIRService) ourPIROffline(config Config) (*OurPIRSystem, *PerformanceS
 			fmt.Printf("文件存在，准备读取\n")
 		}
 		db = ps.readDBFromFile(config.FilePath)
+		config.NumRows = len(db.Records)
 
 	} else {
 		fmt.Printf("文件路径为空，使用随机生成\n")

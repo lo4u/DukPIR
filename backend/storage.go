@@ -21,7 +21,7 @@ type DataStorage struct {
 }
 
 // NewDataStorage 创建新的数据存储服务
-func NewDataStorage(dataDir string) *DataStorage {
+func NewDataStorage(dataDir,dataFile string) *DataStorage {
 	if dataDir == "" {
 		dataDir = "./data"
 	}
@@ -34,7 +34,7 @@ func NewDataStorage(dataDir string) *DataStorage {
 	return &DataStorage{
 		dataDir:    dataDir,
 		usersFile:  filepath.Join(dataDir, "users.json"),
-		recordsFile: filepath.Join(dataDir, "records.txt"),
+		recordsFile: dataFile,
 	}
 }
 

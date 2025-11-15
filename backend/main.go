@@ -43,7 +43,7 @@ func main() {
 	// 创建服务实例
 	authService := NewAuthService()
 	pirService := NewPIRService()
-	dataStorage := NewDataStorage(*dataDir)
+	dataStorage := NewDataStorage(*dataDir, *dbFile)
 
 	// 加载用户数据
 	if users, err := dataStorage.LoadUsers(); err == nil {
@@ -129,6 +129,7 @@ func main() {
 		system.POST("/init-pir", apiHandler.InitializePIR)
 		system.GET("/config", apiHandler.GetPIRConfig)
 		system.GET("/stats", apiHandler.GetStats)
+		system.POST("/upload-db", apiHandler.UploadDb)
 	}
 
 	// 管理员路由

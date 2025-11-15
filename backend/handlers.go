@@ -2,7 +2,11 @@ package main
 
 import (
 	"net/http"
-
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+	"fmt"
 	"github.com/gin-gonic/gin"
 )
 
@@ -78,10 +82,84 @@ type StatsResponse struct {
 	Stats        *PerformanceStats `json:"performance_stats"`
 }
 
+type ConfigResponse struct {
+    FilePath  string `json:"file_path" binding:"required"`
+    NumRows   int    `json:"num_rows"`
+    KeyLen    int    `json:"key_len" binding:"required"`
+    Mode      string `json:"mode" binding:"required"`
+    Val       float64 `json:"val"`
+    ProLimit  float64 `json:"pro_limit"`
+    RateOfPop float64 `json:"rate_of_pop"`
+    PWorse    float64 `json:"p_worse"`
+    QueryKey  string `json:"query_key"`
+    QueryPop  int    `json:"query_pop"`
+    UseNTT    int    `json:"use_ntt"`
+}
+
+
 // SetPWorseRequest 设置p_worse请求
 type SetPWorseRequest struct {
 	PWorse float64 `json:"p_worse" binding:"required"`
 }
+
+// UploadDb 上传数据库文件接口
+// 接受 multipart/form-data 字段名为 "file" 的文件，保存到 dataDir/uploads 下，返回 {"file_path": "<relative/path>"}。
+func (h *APIHandler) UploadDb(c *gin.Context) {
+	// 限制上传大小（可在 router 端统一设置 r.MaxMultipartMemory）
+	// file := c.Request.MultipartForm.File["file"]  // 也可用 c.FormFile
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "未检测到文件（字段名必须为 'file'）"})
+		return
+	}
+
+	// 基础校验：文件名 sanitize（移除路径）
+	origName := filepath.Base(file.Filename)
+	if origName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的文件名"})
+		return
+	}
+
+	// 可选：只允许特定扩展（安全考量）
+	ext := strings.ToLower(filepath.Ext(origName))
+	allowed := map[string]bool{
+		".txt": true,
+		".db":  true,
+		".csv": true,
+	}
+	if !allowed[ext] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "不支持的文件类型，仅允许 .txt/.db/.csv"})
+		return
+	}
+
+	// 确保上传目录存在（使用 dataStorage 的 dataDir 字段）
+	uploadDir := filepath.Join(h.dataStorage.dataDir, "uploads")
+	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建上传目录失败"})
+		return
+	}
+
+	// 避免文件名冲突：加时间戳前缀或随机后缀
+	ts := time.Now().Unix()
+	serverName := fmt.Sprintf("%d_%s", ts, origName)
+	destPath := filepath.Join(uploadDir, serverName)
+
+	// 保存文件
+	if err := c.SaveUploadedFile(file, destPath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存上传文件失败: " + err.Error()})
+		return
+	}
+
+	// 返回给前端可用于初始化的路径（相对路径或后端解析路径）
+	// 这里返回 "uploads/<serverName>"，前端将把该值放到 init 请求的 file_path 字段中
+	relPath := filepath.ToSlash(filepath.Join("uploads", serverName))
+	c.JSON(http.StatusOK, gin.H{
+		"message":   "文件上传成功",
+		"file_path": relPath,
+	})
+}
+
 
 // 认证中间件
 func (h *APIHandler) AuthMiddleware() gin.HandlerFunc {
@@ -468,13 +546,23 @@ func (h *APIHandler) Health(c *gin.Context) {
 // InitializePIR 初始化PIR系统
 func (h *APIHandler) InitializePIR(c *gin.Context) {
 	var config Config
-	if err := c.ShouldBindJSON(&config); err != nil {
+	var config_get ConfigResponse
+	if err := c.ShouldBindJSON(&config_get); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误"})
 		return
 	}
-
+	h.dataStorage.recordsFile = h.dataStorage.dataDir + string('/') + config_get.FilePath // 更新数据存储的文件路径
+	config.FilePath = h.dataStorage.recordsFile
+	config.NumRows = config_get.NumRows
+	config.KeyLen = config_get.KeyLen
+	config.Mode = config_get.Mode
+	config.Val = config_get.Val
+	config.ProLimit = config_get.ProLimit
+	config.RateOfPop = config_get.RateOfPop
+	config.PWorse = config_get.PWorse
+	config.UseNTT = config_get.UseNTT
 	if err := h.pirService.InitializePIRSystem(config); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "PIR系 统初始化失败: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "PIR系统初始化失败: " + err.Error()})
 		return
 	}
 
