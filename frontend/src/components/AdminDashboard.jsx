@@ -81,6 +81,7 @@ const AdminDashboard = () => {
   const { user, logout } = useAuth();
   const [isMobile, setIsMobile] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
+  const [isPopular, setIsPopular] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -158,6 +159,7 @@ const AdminDashboard = () => {
   const handleAddRecord = () => {
     setEditingRecord(null);
     recordForm.resetFields();
+    setIsPopular(true); // 重置为默认值
     setRecordModalVisible(true);
   };
 
@@ -173,7 +175,9 @@ const AdminDashboard = () => {
       key: record.key,
       value: record.value || '',
       probability: record.probability || 0,
+      is_popular: record.is_popular || true,
     });
+    setIsPopular(record.is_popular || true); // 设置热门状态
     setRecordModalVisible(true);
   };
 
@@ -208,6 +212,7 @@ const AdminDashboard = () => {
           ...editingRecord,
           value: values.value,
           probability: Number(values.probability) || 0,
+           is_popular: values.is_popular || true, // 添加热门字段
         };
         
         await adminAPI.updateRecord(dataToSend.key, dataToSend);
@@ -222,15 +227,12 @@ const AdminDashboard = () => {
           return;  // 提前返回，不执行添加
         }
         const currentTotalProbability = records.reduce((sum, record) => sum + (Number(record.probability) || 0), 0);
-        if (currentTotalProbability + newProbability > 1) {
-          message.error('添加失败: 当前数据的概率与其他已有数据的概率和不能超过1');
-          return;  // 提前返回，不执行添加
-        }
 
         const addData = {
-          key: values.key,
-          value: values.value,
-          probability: newProbability,
+          "key": values.key,
+          "value": values.value,
+          "probability": newProbability,
+          "is_popular": values.is_popular || true,
         };
         const res = await adminAPI.addRecord(dataToSend);
         newRecord = { 
@@ -572,6 +574,18 @@ const AdminDashboard = () => {
                 style={{ width: '100%' }}
                 placeholder="请输入概率"
               />
+            </Form.Item>
+            
+            {/* 添加是否热门选项 */}
+            <Form.Item
+              name="is_popular"
+              label="是否热门"
+              valuePropName="checked"
+            >
+              <Select placeholder="请选择是否热门">
+                <Option value={true}>是</Option>
+                <Option value={false}>否</Option>
+              </Select>
             </Form.Item>
             
             <Form.Item>
