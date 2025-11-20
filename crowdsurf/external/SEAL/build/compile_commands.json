@@ -1,0 +1,104 @@
+[
+{
+  "directory": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-build",
+  "command": "/usr/bin/cc -DHEXL_HAS_AVX256 -DSTACK_LINE_READER_BUFFER_SIZE=1024 -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/include -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/include/internal -O3 -DNDEBUG -std=gnu99 -fPIC -o CMakeFiles/utils.dir/src/filesystem.c.o -c /home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/src/filesystem.c",
+  "file": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/src/filesystem.c",
+  "output": "thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-build/CMakeFiles/utils.dir/src/filesystem.c.o"
+},
+{
+  "directory": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-build",
+  "command": "/usr/bin/cc -DHEXL_HAS_AVX256 -DSTACK_LINE_READER_BUFFER_SIZE=1024 -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/include -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/include/internal -O3 -DNDEBUG -std=gnu99 -fPIC -o CMakeFiles/utils.dir/src/stack_line_reader.c.o -c /home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/src/stack_line_reader.c",
+  "file": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/src/stack_line_reader.c",
+  "output": "thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-build/CMakeFiles/utils.dir/src/stack_line_reader.c.o"
+},
+{
+  "directory": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-build",
+  "command": "/usr/bin/cc -DHEXL_HAS_AVX256 -DSTACK_LINE_READER_BUFFER_SIZE=1024 -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/include -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/include/internal -O3 -DNDEBUG -std=gnu99 -fPIC -o CMakeFiles/utils.dir/src/string_view.c.o -c /home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/src/string_view.c",
+  "file": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/src/string_view.c",
+  "output": "thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-build/CMakeFiles/utils.dir/src/string_view.c.o"
+},
+{
+  "directory": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-build",
+  "command": "/usr/bin/cc -DHEXL_HAS_AVX256 -DSTACK_LINE_READER_BUFFER_SIZE=1024 -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/include -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/include/internal -O3 -DNDEBUG -std=gnu99 -fPIC -o CMakeFiles/cpu_features.dir/src/cpuinfo_x86.c.o -c /home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/src/cpuinfo_x86.c",
+  "file": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/src/cpuinfo_x86.c",
+  "output": "thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-build/CMakeFiles/cpu_features.dir/src/cpuinfo_x86.c.o"
+},
+{
+  "directory": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-build",
+  "command": "/usr/bin/cc -DHAVE_DLFCN_H -DHAVE_STRONG_GETAUXVAL -DHEXL_HAS_AVX256 -DSTACK_LINE_READER_BUFFER_SIZE=1024 -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/include -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/include/internal -O3 -DNDEBUG -std=gnu99 -fPIC -o CMakeFiles/unix_based_hardware_detection.dir/src/hwcaps.c.o -c /home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/src/hwcaps.c",
+  "file": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/src/hwcaps.c",
+  "output": "thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-build/CMakeFiles/unix_based_hardware_detection.dir/src/hwcaps.c.o"
+},
+{
+  "directory": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-build",
+  "command": "/usr/bin/cc -DHEXL_HAS_AVX256 -DSTACK_LINE_READER_BUFFER_SIZE=1024 -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/include -O3 -DNDEBUG -std=gnu99 -fPIE -o CMakeFiles/list_cpu_features.dir/src/utils/list_cpu_features.c.o -c /home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/src/utils/list_cpu_features.c",
+  "file": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/src/utils/list_cpu_features.c",
+  "output": "thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-build/CMakeFiles/list_cpu_features.dir/src/utils/list_cpu_features.c.o"
+},
+{
+  "directory": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/hexl",
+  "command": "/usr/bin/c++ -DHEXL_HAS_AVX256 -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/include -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/include -O3 -DNDEBUG -std=c++17 -fPIC -Wall -Wconversion -Wshadow -pedantic -Wextra -Wno-unknown-pragmas -march=native -O3 -fomit-frame-pointer -Wno-sign-conversion -Wno-implicit-int-conversion -Wno-unknown-warning -Wno-unknown-warning-option -o CMakeFiles/hexl.dir/eltwise/eltwise-mult-mod.cpp.o -c /home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/eltwise/eltwise-mult-mod.cpp",
+  "file": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/eltwise/eltwise-mult-mod.cpp",
+  "output": "thirdparty/hexl-build/hexl/CMakeFiles/hexl.dir/eltwise/eltwise-mult-mod.cpp.o"
+},
+{
+  "directory": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/hexl",
+  "command": "/usr/bin/c++ -DHEXL_HAS_AVX256 -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/include -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/include -O3 -DNDEBUG -std=c++17 -fPIC -Wall -Wconversion -Wshadow -pedantic -Wextra -Wno-unknown-pragmas -march=native -O3 -fomit-frame-pointer -Wno-sign-conversion -Wno-implicit-int-conversion -Wno-unknown-warning -Wno-unknown-warning-option -o CMakeFiles/hexl.dir/eltwise/eltwise-reduce-mod.cpp.o -c /home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/eltwise/eltwise-reduce-mod.cpp",
+  "file": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/eltwise/eltwise-reduce-mod.cpp",
+  "output": "thirdparty/hexl-build/hexl/CMakeFiles/hexl.dir/eltwise/eltwise-reduce-mod.cpp.o"
+},
+{
+  "directory": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/hexl",
+  "command": "/usr/bin/c++ -DHEXL_HAS_AVX256 -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/include -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/include -O3 -DNDEBUG -std=c++17 -fPIC -Wall -Wconversion -Wshadow -pedantic -Wextra -Wno-unknown-pragmas -march=native -O3 -fomit-frame-pointer -Wno-sign-conversion -Wno-implicit-int-conversion -Wno-unknown-warning -Wno-unknown-warning-option -o CMakeFiles/hexl.dir/eltwise/eltwise-sub-mod.cpp.o -c /home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/eltwise/eltwise-sub-mod.cpp",
+  "file": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/eltwise/eltwise-sub-mod.cpp",
+  "output": "thirdparty/hexl-build/hexl/CMakeFiles/hexl.dir/eltwise/eltwise-sub-mod.cpp.o"
+},
+{
+  "directory": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/hexl",
+  "command": "/usr/bin/c++ -DHEXL_HAS_AVX256 -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/include -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/include -O3 -DNDEBUG -std=c++17 -fPIC -Wall -Wconversion -Wshadow -pedantic -Wextra -Wno-unknown-pragmas -march=native -O3 -fomit-frame-pointer -Wno-sign-conversion -Wno-implicit-int-conversion -Wno-unknown-warning -Wno-unknown-warning-option -o CMakeFiles/hexl.dir/eltwise/eltwise-add-mod.cpp.o -c /home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/eltwise/eltwise-add-mod.cpp",
+  "file": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/eltwise/eltwise-add-mod.cpp",
+  "output": "thirdparty/hexl-build/hexl/CMakeFiles/hexl.dir/eltwise/eltwise-add-mod.cpp.o"
+},
+{
+  "directory": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/hexl",
+  "command": "/usr/bin/c++ -DHEXL_HAS_AVX256 -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/include -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/include -O3 -DNDEBUG -std=c++17 -fPIC -Wall -Wconversion -Wshadow -pedantic -Wextra -Wno-unknown-pragmas -march=native -O3 -fomit-frame-pointer -Wno-sign-conversion -Wno-implicit-int-conversion -Wno-unknown-warning -Wno-unknown-warning-option -o CMakeFiles/hexl.dir/eltwise/eltwise-fma-mod.cpp.o -c /home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/eltwise/eltwise-fma-mod.cpp",
+  "file": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/eltwise/eltwise-fma-mod.cpp",
+  "output": "thirdparty/hexl-build/hexl/CMakeFiles/hexl.dir/eltwise/eltwise-fma-mod.cpp.o"
+},
+{
+  "directory": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/hexl",
+  "command": "/usr/bin/c++ -DHEXL_HAS_AVX256 -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/include -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/include -O3 -DNDEBUG -std=c++17 -fPIC -Wall -Wconversion -Wshadow -pedantic -Wextra -Wno-unknown-pragmas -march=native -O3 -fomit-frame-pointer -Wno-sign-conversion -Wno-implicit-int-conversion -Wno-unknown-warning -Wno-unknown-warning-option -o CMakeFiles/hexl.dir/eltwise/eltwise-cmp-add.cpp.o -c /home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/eltwise/eltwise-cmp-add.cpp",
+  "file": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/eltwise/eltwise-cmp-add.cpp",
+  "output": "thirdparty/hexl-build/hexl/CMakeFiles/hexl.dir/eltwise/eltwise-cmp-add.cpp.o"
+},
+{
+  "directory": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/hexl",
+  "command": "/usr/bin/c++ -DHEXL_HAS_AVX256 -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/include -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/include -O3 -DNDEBUG -std=c++17 -fPIC -Wall -Wconversion -Wshadow -pedantic -Wextra -Wno-unknown-pragmas -march=native -O3 -fomit-frame-pointer -Wno-sign-conversion -Wno-implicit-int-conversion -Wno-unknown-warning -Wno-unknown-warning-option -o CMakeFiles/hexl.dir/eltwise/eltwise-cmp-sub-mod.cpp.o -c /home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/eltwise/eltwise-cmp-sub-mod.cpp",
+  "file": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/eltwise/eltwise-cmp-sub-mod.cpp",
+  "output": "thirdparty/hexl-build/hexl/CMakeFiles/hexl.dir/eltwise/eltwise-cmp-sub-mod.cpp.o"
+},
+{
+  "directory": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/hexl",
+  "command": "/usr/bin/c++ -DHEXL_HAS_AVX256 -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/include -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/include -O3 -DNDEBUG -std=c++17 -fPIC -Wall -Wconversion -Wshadow -pedantic -Wextra -Wno-unknown-pragmas -march=native -O3 -fomit-frame-pointer -Wno-sign-conversion -Wno-implicit-int-conversion -Wno-unknown-warning -Wno-unknown-warning-option -o CMakeFiles/hexl.dir/ntt/ntt-internal.cpp.o -c /home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/ntt/ntt-internal.cpp",
+  "file": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/ntt/ntt-internal.cpp",
+  "output": "thirdparty/hexl-build/hexl/CMakeFiles/hexl.dir/ntt/ntt-internal.cpp.o"
+},
+{
+  "directory": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/hexl",
+  "command": "/usr/bin/c++ -DHEXL_HAS_AVX256 -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/include -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/include -O3 -DNDEBUG -std=c++17 -fPIC -Wall -Wconversion -Wshadow -pedantic -Wextra -Wno-unknown-pragmas -march=native -O3 -fomit-frame-pointer -Wno-sign-conversion -Wno-implicit-int-conversion -Wno-unknown-warning -Wno-unknown-warning-option -o CMakeFiles/hexl.dir/ntt/ntt-radix-2.cpp.o -c /home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/ntt/ntt-radix-2.cpp",
+  "file": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/ntt/ntt-radix-2.cpp",
+  "output": "thirdparty/hexl-build/hexl/CMakeFiles/hexl.dir/ntt/ntt-radix-2.cpp.o"
+},
+{
+  "directory": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/hexl",
+  "command": "/usr/bin/c++ -DHEXL_HAS_AVX256 -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/include -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/include -O3 -DNDEBUG -std=c++17 -fPIC -Wall -Wconversion -Wshadow -pedantic -Wextra -Wno-unknown-pragmas -march=native -O3 -fomit-frame-pointer -Wno-sign-conversion -Wno-implicit-int-conversion -Wno-unknown-warning -Wno-unknown-warning-option -o CMakeFiles/hexl.dir/ntt/ntt-radix-4.cpp.o -c /home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/ntt/ntt-radix-4.cpp",
+  "file": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/ntt/ntt-radix-4.cpp",
+  "output": "thirdparty/hexl-build/hexl/CMakeFiles/hexl.dir/ntt/ntt-radix-4.cpp.o"
+},
+{
+  "directory": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/hexl",
+  "command": "/usr/bin/c++ -DHEXL_HAS_AVX256 -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/include -I/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-src/include -O3 -DNDEBUG -std=c++17 -fPIC -Wall -Wconversion -Wshadow -pedantic -Wextra -Wno-unknown-pragmas -march=native -O3 -fomit-frame-pointer -Wno-sign-conversion -Wno-implicit-int-conversion -Wno-unknown-warning -Wno-unknown-warning-option -o CMakeFiles/hexl.dir/number-theory/number-theory.cpp.o -c /home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/number-theory/number-theory.cpp",
+  "file": "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-src/hexl/number-theory/number-theory.cpp",
+  "output": "thirdparty/hexl-build/hexl/CMakeFiles/hexl.dir/number-theory/number-theory.cpp.o"
+}
+]

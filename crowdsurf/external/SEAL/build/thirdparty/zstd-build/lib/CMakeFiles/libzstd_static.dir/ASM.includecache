@@ -1,0 +1,14 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/zstd-src/lib/common/portability_macros.h
+
+/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/zstd-src/lib/decompress/huf_decompress_amd64.S
+../common/portability_macros.h
+/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/zstd-src/lib/common/portability_macros.h
+

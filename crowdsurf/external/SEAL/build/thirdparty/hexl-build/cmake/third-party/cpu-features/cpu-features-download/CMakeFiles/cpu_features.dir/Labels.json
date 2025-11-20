@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-download/CMakeFiles/cpu_features"
+		},
+		{
+			"file" : "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-download/CMakeFiles/cpu_features.rule"
+		},
+		{
+			"file" : "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-download/CMakeFiles/cpu_features-complete.rule"
+		},
+		{
+			"file" : "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-download/cpu_features-prefix/src/cpu_features-stamp/cpu_features-build.rule"
+		},
+		{
+			"file" : "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-download/cpu_features-prefix/src/cpu_features-stamp/cpu_features-configure.rule"
+		},
+		{
+			"file" : "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-download/cpu_features-prefix/src/cpu_features-stamp/cpu_features-download.rule"
+		},
+		{
+			"file" : "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-download/cpu_features-prefix/src/cpu_features-stamp/cpu_features-install.rule"
+		},
+		{
+			"file" : "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-download/cpu_features-prefix/src/cpu_features-stamp/cpu_features-mkdir.rule"
+		},
+		{
+			"file" : "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-download/cpu_features-prefix/src/cpu_features-stamp/cpu_features-patch.rule"
+		},
+		{
+			"file" : "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-download/cpu_features-prefix/src/cpu_features-stamp/cpu_features-test.rule"
+		},
+		{
+			"file" : "/home/lo4u/workspace/ddpir/crowdsurf/external/SEAL/build/thirdparty/hexl-build/cmake/third-party/cpu-features/cpu-features-download/cpu_features-prefix/src/cpu_features-stamp/cpu_features-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"cpu_features"
+		],
+		"name" : "cpu_features"
+	}
+}
