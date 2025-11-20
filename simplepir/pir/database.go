@@ -1,7 +1,9 @@
 package pir
 
-import "math"
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
 type DBinfo struct {
 	Num        uint64 // number of DB entries.
@@ -11,13 +13,13 @@ type DBinfo struct {
 	Ne      uint64 // number of Z_p elems per DB entry, if DB entry size > log(p).
 
 	X uint64 // tunable param that governs communication,
-	         // must be in range [1, ne] and must be a divisor of ne;
-	         // represents the number of times the scheme is repeated.
+	// must be in range [1, ne] and must be a divisor of ne;
+	// represents the number of times the scheme is repeated.
 	P    uint64 // plaintext modulus.
 	Logq uint64 // (logarithm of) ciphertext modulus.
 
 	// For in-memory DB compression
-	Basis     uint64 
+	Basis     uint64
 	Squishing uint64
 	Cols      uint64
 }
@@ -32,7 +34,7 @@ func (DB *Database) Squish() {
 	//DB.Data.Dim()
 
 	DB.Info.Basis = 10
-	DB.Info.Squishing = 3 
+	DB.Info.Squishing = 3
 	DB.Info.Cols = DB.Data.Cols
 	DB.Data.Squish(DB.Info.Basis, DB.Info.Squishing)
 
@@ -40,7 +42,7 @@ func (DB *Database) Squish() {
 	//DB.Data.Dim()
 
 	// Check that params allow for this compression
-	if (DB.Info.P > (1 << DB.Info.Basis)) || (DB.Info.Logq < DB.Info.Basis * DB.Info.Squishing) {
+	if (DB.Info.P > (1 << DB.Info.Basis)) || (DB.Info.Logq < DB.Info.Basis*DB.Info.Squishing) {
 		panic("Bad params")
 	}
 }
@@ -155,7 +157,7 @@ func SetupDB(Num, row_length uint64, p *Params) *Database {
 	// 	float64(p.L*p.M)*math.Log2(float64(p.P))/(1024.0*1024.0*8.0))
 
 	if db_elems > p.L*p.M {
-		fmt.Printf("db_elems, p.L, p.M: %d, %d, %d",db_elems,p.L,p.M)
+		fmt.Printf("db_elems, p.L, p.M: %d, %d, %d", db_elems, p.L, p.M)
 		panic("Params and database size don't match")
 	}
 

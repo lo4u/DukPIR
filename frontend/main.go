@@ -54,6 +54,8 @@ type OurPIRSystem struct {
 // 性能统计
 type PerformanceStats struct {
 	OfflineTime        time.Duration
+	HintTime           time.Duration
+	EncodeTime         time.Duration
 	addTime            time.Duration
 	updateTime         time.Duration
 	deleteTime         time.Duration
@@ -94,6 +96,7 @@ func main() {
 	startOffline := time.Now()
 	system, stats := ourPIROffline(config)
 	stats.OfflineTime = time.Since(startOffline)
+	stats.EncodeTime = stats.OfflineTime - stats.HintTime
 	if config.QueryKey == "" {
 		// 测试删除和添加功能
 		// testUpdateFunctions(system,stats,config.PWorse, config.KeyLen)
@@ -163,6 +166,8 @@ func parseFlags() Config {
 func printPerformanceStats(stats *PerformanceStats) {
 	fmt.Printf("\n=== Performance Statistics ===\n")
 	fmt.Printf("Offline Time: %.2f ms\n", float64(stats.OfflineTime.Microseconds())/1000.0)
+	fmt.Printf("Encoding Time: %.2f ms\n", float64(stats.EncodeTime.Microseconds())/1000.0)
+	fmt.Printf("Hint computation Time: %.2f ms\n", float64(stats.HintTime.Microseconds())/1000.0)
 	fmt.Printf("Add operation time: %v\n", stats.addTime)
 	fmt.Printf("Update operation time: %v\n", stats.updateTime)
 	fmt.Printf("Delete operation time: %v\n", stats.deleteTime)
@@ -260,9 +265,10 @@ func ourPIROffline(config Config) (*OurPIRSystem, *PerformanceStats) {
 
 	fmt.Printf("Value maximum length: %d bytes, divided into %d chunks\n", maxValueLen, valueChunks)
 
-	fullDatabases, offlineComm := convertFilterToDatabases(fullFilter, valueChunks, config)
-	popularDatabases, _ := convertFilterToDatabases(popularFilter, valueChunks, config)
+	fullDatabases, offlineComm, totalHintTime := convertFilterToDatabases(fullFilter, valueChunks, config)
+	popularDatabases, _, _ := convertFilterToDatabases(popularFilter, valueChunks, config)
 	stats.OfflineComm = offlineComm
+	stats.HintTime = totalHintTime
 
 	system := &OurPIRSystem{
 		FullDatabases:       fullDatabases,
@@ -486,7 +492,7 @@ func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *
 }
 
 // convertFilterToDatabases 将cuckoo filter转换为数据库（修改后的版本）
-func convertFilterToDatabases(filter *cf.Filter, valueChunks int, config Config) ([]*PIRDatabase, float64) {
+func convertFilterToDatabases(filter *cf.Filter, valueChunks int, config Config) ([]*PIRDatabase, float64, time.Duration) {
 	buckets := filter.GetBuckets()
 	values := filter.GetValues()
 	bucketSize := filter.GetBucketSize()
@@ -503,6 +509,7 @@ func convertFilterToDatabases(filter *cf.Filter, valueChunks int, config Config)
 		index       int
 		database    *PIRDatabase
 		offlineComm float64
+		hintTime    time.Duration
 	}, totalDBs)
 
 	// 并行初始化fingerprint数据库 (d=8)
@@ -522,24 +529,29 @@ func convertFilterToDatabases(filter *cf.Filter, valueChunks int, config Config)
 			}
 
 			pirInst := &pir.SimplePIR{}
-			params := pirInst.PickParams(uint64(numBuckets), 8, 1<<10, 32)
+			params := pirInst.PickParams(uint64(numBuckets), 8, 1<<11, 32)
 			db := pir.MakeDB(uint64(numBuckets), 8, &params, fingerprintValues)
 
-			sharedState := pirInst.Init(db.Info, params)
-
+			timeStart := time.Now()
+			var sharedState pir.State
 			var serverState pir.State
 			var offlineMsg pir.Msg
 			if config.use_ntt == 1 {
-				serverState, offlineMsg = pirInst.FakeSetup_NTT(db, sharedState, params)
+				seeds := pirInst.InitSeed(db.Info, params)
+				sharedState = pirInst.MakeState_fromSeeds(params, seeds)
+				serverState, offlineMsg = pirInst.FakeSetup_NTT(db, seeds, params)
 			} else {
+				sharedState = pirInst.Init(db.Info, params)
 				serverState, offlineMsg = pirInst.Setup(db, sharedState, params)
 			}
+			hintTime := time.Since(timeStart)
 			offlineComm := float64(offlineMsg.Size() * uint64(32) / (8.0 * 1024.0 * 1024.0))
 
 			resultChan <- struct {
 				index       int
 				database    *PIRDatabase
 				offlineComm float64
+				hintTime    time.Duration
 			}{
 				index: slot,
 				database: &PIRDatabase{
@@ -552,6 +564,7 @@ func convertFilterToDatabases(filter *cf.Filter, valueChunks int, config Config)
 					OfflineMsg:  offlineMsg,
 				},
 				offlineComm: offlineComm,
+				hintTime:    hintTime,
 			}
 		}(slot)
 	}
@@ -567,7 +580,7 @@ func convertFilterToDatabases(filter *cf.Filter, valueChunks int, config Config)
 
 			// 先选择参数
 			pirInst := &pir.SimplePIR{}
-			params := pirInst.PickParams(uint64(totalValues), 64, 1<<10, 32)
+			params := pirInst.PickParams(uint64(totalValues), 64, 1<<11, 32)
 			// params = pirInst.PickParams(uint64(params.L*params.M), 64, 1<<10, 32)
 			// fmt.Printf("\ntotalValues, p.L, p.M: %d, %d, %d\n",uint64(totalValues),params.L/7,params.M)
 
@@ -614,8 +627,19 @@ func convertFilterToDatabases(filter *cf.Filter, valueChunks int, config Config)
 			// 用填充好的数据创建数据库
 			db := pir.MakeDB(uint64(params.L/7*params.M), 64, &params, valueValues)
 
-			sharedState := pirInst.Init(db.Info, params)
-			serverState, offlineMsg := pirInst.Setup(db, sharedState, params)
+			timeStart := time.Now()
+			var sharedState pir.State
+			var serverState pir.State
+			var offlineMsg pir.Msg
+			if config.use_ntt == 1 {
+				seeds := pirInst.InitSeed(db.Info, params)
+				sharedState = pirInst.MakeState_fromSeeds(params, seeds)
+				serverState, offlineMsg = pirInst.FakeSetup_NTT(db, seeds, params)
+			} else {
+				sharedState = pirInst.Init(db.Info, params)
+				serverState, offlineMsg = pirInst.Setup(db, sharedState, params)
+			}
+			hintTime := time.Since(timeStart)
 
 			// 计算离线通信量
 			offlineComm := calculateMsgSize([]pir.Msg{offlineMsg})
@@ -627,6 +651,7 @@ func convertFilterToDatabases(filter *cf.Filter, valueChunks int, config Config)
 				index       int
 				database    *PIRDatabase
 				offlineComm float64
+				hintTime    time.Duration
 			}{
 				index: dbIndex,
 				database: &PIRDatabase{
@@ -639,6 +664,7 @@ func convertFilterToDatabases(filter *cf.Filter, valueChunks int, config Config)
 					OfflineMsg:  offlineMsg,
 				},
 				offlineComm: offlineComm,
+				hintTime:    hintTime,
 			}
 		}(slot)
 	}
@@ -651,12 +677,14 @@ func convertFilterToDatabases(filter *cf.Filter, valueChunks int, config Config)
 
 	// 收集结果
 	var totalOfflineComm float64
+	var totalHintTime time.Duration
 	for result := range resultChan {
 		databases[result.index] = result.database
 		totalOfflineComm += result.offlineComm
+		totalHintTime += result.hintTime
 	}
 
-	return databases, totalOfflineComm
+	return databases, totalOfflineComm, totalHintTime
 }
 
 // processResultsNew 新的处理查询结果函数

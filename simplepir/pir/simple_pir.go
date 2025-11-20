@@ -4,10 +4,13 @@ package pir
 // #include "pir.h"
 import "C"
 import (
+	"encoding/binary"
 	"fmt"
+	"io"
 	"math"
+	"math/rand"
 
-	"github.com/tuneinsight/lattigo/v6/ring"
+	"github.com/ryanleh/secure-inference/crypto/rlwe"
 )
 
 // import "time"
@@ -109,6 +112,18 @@ func (pi *SimplePIR) Init(info DBinfo, p Params) State {
 	return MakeState(A)
 }
 
+func (pi *SimplePIR) InitSeed(info DBinfo, p Params) []uint64 {
+	rng := rand.New(rand.NewSource(99))
+	num := int(math.Ceil(float64(p.M) / float64(p.N)))
+	seeds := make([]uint64, 8*num)
+	buf := make([]byte, 8)
+	for i := range seeds {
+		io.ReadFull(rng, buf)
+		seeds[i] = binary.LittleEndian.Uint64(buf[:])
+	}
+	return seeds
+}
+
 func (pi *SimplePIR) InitCompressed(info DBinfo, p Params) (State, CompressedState) {
 	seed := RandomPRGKey()
 	return pi.InitCompressedSeeded(info, p, seed)
@@ -137,63 +152,15 @@ func (pi *SimplePIR) Setup(DB *Database, shared State, p Params) (State, Msg) {
 	return MakeState(), MakeMsg(H)
 }
 
-func (pi *SimplePIR) FakeSetup_NTT(DB *Database, shared State, p Params) (State, Msg) {
-	// A := shared.Data[0]
+func (pi *SimplePIR) FakeSetup_NTT(DB *Database, seeds []uint64, p Params) (State, Msg) {
+	ctx := NewContext(p.P, p.N, true)
+	num := len(seeds) / 8
+	if num*8 != len(seeds) {
+		panic("length is not right")
+	}
+	H := unsafeToMatrix(ctx.ComputeHint(UnsafeToMatrix32(DB.Data), seeds, num))
 	// H := MatrixMul(DB.Data, A)
 
-	A := shared.Data[0]
-	D := DB.Data
-	sqrt_N := D.Rows
-	n := p.N
-	k := uint64(math.Ceil(float64(sqrt_N) / float64(n)))
-
-	r, err := ring.NewRing(int(n), []uint64{4293918721})
-	if err != nil {
-		panic(err)
-	}
-
-	H := MatrixZeros(sqrt_N, n)
-	H_poly := make([]ring.Poly, sqrt_N)
-	for i := uint64(0); i < sqrt_N; i++ {
-		H_poly[i] = r.NewPoly()
-	}
-
-	for i := uint64(0); i < k; i++ {
-		var D_i *Matrix
-		var A_i *Matrix
-		if i < k-1 {
-			// 注意这里的D_i是深层拷贝
-			D_i = D.SelectColumns(i*n, n)
-			A_i = A.SelectRows(i*n, 1)
-		} else {
-			D_i = MatrixRand(n, n, 10, 0)
-			A_i = MatrixRand(n, n, 32, 0)
-		}
-
-		p2 := r.NewPoly()
-		p2_ntt := r.NewPoly()
-		for t := uint64(0); t < n; t++ {
-			p2.Coeffs[0][t] = uint64(A_i.Data[t])
-		}
-		r.NTT(p2, p2_ntt)
-
-		for j := uint64(0); j < sqrt_N; j++ {
-			p1 := r.NewPoly()
-			// copy(p1.Coeffs[0], D_i.Data[j])
-			for t := uint64(0); t < n; t++ {
-				p1.Coeffs[0][t] = uint64(D_i.Data[j*n+t])
-			}
-			r.NTT(p1, p1)
-			r.MulCoeffsMontgomeryThenAdd(p1, p2_ntt, H_poly[j])
-		}
-	}
-
-	for i := uint64(0); i < sqrt_N; i++ {
-		r.INTT(H_poly[i], H_poly[i])
-		for t := uint64(0); t < n; t++ {
-			H.Data[i*n+t] = C.Elem(H_poly[i].Coeffs[0][t])
-		}
-	}
 	// map the database entries to [0, p] (rather than [-p/1, p/2]) and then
 	// pack the database more tightly in memory, because the online computation
 	// is memory-bandwidth-bound
@@ -201,6 +168,50 @@ func (pi *SimplePIR) FakeSetup_NTT(DB *Database, shared State, p Params) (State,
 	DB.Squish()
 
 	return MakeState(), MakeMsg(H)
+}
+
+func (pi *SimplePIR) MakeState_fromSeeds(p Params, seeds []uint64) State {
+	ctx := NewContext(p.P, p.N, true)
+	num := len(seeds) / 8
+	if num*8 != len(seeds) {
+		panic("length is not right")
+	}
+	if ctx.ModulusSize() != 1 {
+		panic("Modulus size > 1 not supported")
+	}
+	q := float64(ctx.Modulus()[0])
+	pMod := float64(uint64(1) << p.Logq)
+	key := ctx.NewKey()
+	defer key.Free()
+
+	A := &Matrix{
+		Rows: p.M,
+		Cols: p.N,
+		Data: make([]C.Elem, p.M*p.N),
+	}
+
+	// module switch
+	for i := uint64(0); i < uint64(num); i++ {
+		// Build A
+		seed := seeds[i*8 : (i+1)*8]
+		a := rlwe.NewA(key, seed)
+		defer a.Free()
+		data := a.GetData()
+		for j := uint64(0); j < p.N; j++ {
+			for k := uint64(0); k < p.N; k++ {
+				idx := (i * p.N * p.N) + (j * p.N) + k
+				if idx >= uint64(len(A.Data)) {
+					return MakeState(A)
+				} else if k < j {
+					A.Data[(i*p.N*p.N)+(j*p.N)+k] = C.Elem(int32(math.Round(float64(-data[k-j+p.N]%uint64(q)) * pMod / q)))
+				} else {
+					A.Data[(i*p.N*p.N)+(j*p.N)+k] = C.Elem(int32(math.Round(float64(data[k-j]) * pMod / q)))
+				}
+			}
+		}
+	}
+
+	return MakeState(A)
 }
 
 func (pi *SimplePIR) FakeSetup(DB *Database, p Params) (State, float64) {
