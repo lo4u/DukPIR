@@ -35,6 +35,8 @@ def extract_performance_statistics(lines: List[str], start_index: int) -> Dict[s
     # 性能统计指标的正则表达式模式
     patterns = {
         'Offline Time': r'Offline Time:\s*([\d.]+)\s*ms',
+        'Encode Time': r'Encode Time:\s*([\d.]+)\s*ms',
+        'Hint Time': r'Hint computation Time:\s*([\d.]+)\s*ms',
         'Add operation time': r'Add operation time:\s*([\d.]+)ms',
         'Update operation time': r'Update operation time:\s*([\d.]+)ms',
         'Delete operation time': r'Delete operation time:\s*([\d.]+)ms',
@@ -160,7 +162,7 @@ def write_to_csv(results: List[Dict[str, str]], output_filename: str):
     # 定义列的顺序
     fieldnames = [
         'test_name', 'run_number', 'db_size', 'key_len', 'p_worse', 'querypop',
-        'Offline Time', 'Add operation time', 'Update operation time', 'Delete operation time',
+        'Offline Time', 'Encode Time', 'Hint Time', 'Add operation time', 'Update operation time', 'Delete operation time',
         'Online Query Time', 'Online Response Time', 'Total Online Time',
         'Offline Communication', 'Online Query Communication', 
         'Online Answer Communication', 'Total Communication'

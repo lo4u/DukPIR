@@ -68,17 +68,18 @@ type PerformanceStats struct {
 
 // 命令行参数
 type Config struct {
-	FilePath  string
-	NumRows   int
-	KeyLen    int
-	Mode      string
-	Val       float64
-	ProLimit  float64
-	RateOfPop float64
-	PWorse    float64
-	QueryKey  string
-	QueryPop  int
-	use_ntt   int
+	FilePath    string
+	NumRows     int
+	KeyLen      int
+	Mode        string
+	Val         float64
+	ProLimit    float64
+	RateOfPop   float64
+	PWorse      float64
+	QueryKey    string
+	QueryPop    int
+	UseNTT      int
+	OnlyOffline int
 }
 
 type ResultInfo struct {
@@ -96,13 +97,12 @@ func main() {
 	startOffline := time.Now()
 	system, stats := ourPIROffline(config)
 	stats.OfflineTime = time.Since(startOffline)
-	stats.EncodeTime = stats.OfflineTime - stats.HintTime
 	if config.QueryKey == "" {
 		// 测试删除和添加功能
 		// testUpdateFunctions(system,stats,config.PWorse, config.KeyLen)
 	}
 	//WARNING: 只测试离线阶段，在此处直接返回
-	if config.use_ntt == 1 {
+	if config.OnlyOffline == 1 {
 		printPerformanceStats(stats)
 		return
 	}
@@ -144,7 +144,8 @@ func parseFlags() Config {
 	flag.Float64Var(&config.PWorse, "p_worse", 0.1, "Probability to use full database")
 	flag.StringVar(&config.QueryKey, "qkey", "", "Query key")
 	flag.IntVar(&config.QueryPop, "querypop", 1, "Query from popular database (1) or non-popular (0)")
-	flag.IntVar(&config.use_ntt, "use_ntt", 0, "Whether to use NTT optimization (1: use, 0: not use)")
+	flag.IntVar(&config.UseNTT, "use_ntt", 0, "Whether to use NTT optimization (1: use, 0: not use)")
+	flag.IntVar(&config.OnlyOffline, "only_offline", 0, "Whether to only run offline phase (1: only offline, 0: run both)")
 
 	flag.Parse()
 
@@ -152,6 +153,10 @@ func parseFlags() Config {
 		config.ProLimit = config.Val
 	} else {
 		config.RateOfPop = config.Val
+	}
+
+	if config.UseNTT == 1 {
+		config.OnlyOffline = 1 // 如果使用NTT，则只运行离线阶段
 	}
 
 	if config.FilePath == "" && (config.NumRows == 0 || config.KeyLen == 0) {
@@ -166,7 +171,7 @@ func parseFlags() Config {
 func printPerformanceStats(stats *PerformanceStats) {
 	fmt.Printf("\n=== Performance Statistics ===\n")
 	fmt.Printf("Offline Time: %.2f ms\n", float64(stats.OfflineTime.Microseconds())/1000.0)
-	fmt.Printf("Encoding Time: %.2f ms\n", float64(stats.EncodeTime.Microseconds())/1000.0)
+	fmt.Printf("Encode Time: %.2f ms\n", float64(stats.EncodeTime.Microseconds())/1000.0)
 	fmt.Printf("Hint computation Time: %.2f ms\n", float64(stats.HintTime.Microseconds())/1000.0)
 	fmt.Printf("Add operation time: %v\n", stats.addTime)
 	fmt.Printf("Update operation time: %v\n", stats.updateTime)
@@ -193,6 +198,9 @@ func ourPIROffline(config Config) (*OurPIRSystem, *PerformanceStats) {
 	}
 
 	fmt.Printf("Total records: %d\n", len(db.Records))
+
+	// 对编码计时
+	start := time.Now()
 
 	sort.Slice(db.Records, func(i, j int) bool {
 		return db.Records[i].Probability > db.Records[j].Probability
@@ -269,6 +277,7 @@ func ourPIROffline(config Config) (*OurPIRSystem, *PerformanceStats) {
 	popularDatabases, _, _ := convertFilterToDatabases(popularFilter, valueChunks, config)
 	stats.OfflineComm = offlineComm
 	stats.HintTime = totalHintTime
+	stats.EncodeTime = time.Since(start) - stats.HintTime
 
 	system := &OurPIRSystem{
 		FullDatabases:       fullDatabases,
@@ -504,8 +513,7 @@ func convertFilterToDatabases(filter *cf.Filter, valueChunks int, config Config)
 	databases := make([]*PIRDatabase, totalDBs)
 
 	// 使用通道和等待组进行并行处理
-	var wg sync.WaitGroup
-	resultChan := make(chan struct {
+	results := make([]struct {
 		index       int
 		database    *PIRDatabase
 		offlineComm float64
@@ -514,171 +522,155 @@ func convertFilterToDatabases(filter *cf.Filter, valueChunks int, config Config)
 
 	// 并行初始化fingerprint数据库 (d=8)
 	for slot := 0; slot < 4; slot++ {
-		wg.Add(1)
-		go func(slot int) {
-			defer wg.Done()
+		fingerprintValues := make([]uint64, numBuckets)
 
-			fingerprintValues := make([]uint64, numBuckets)
-
-			for bucketIdx := 0; bucketIdx < numBuckets; bucketIdx++ {
-				if slot < len(buckets[bucketIdx]) {
-					fingerprintValues[bucketIdx] = uint64(buckets[bucketIdx][slot])
-				} else {
-					fingerprintValues[bucketIdx] = 0
-				}
-			}
-
-			pirInst := &pir.SimplePIR{}
-			params := pirInst.PickParams(uint64(numBuckets), 8, 1<<11, 32)
-			db := pir.MakeDB(uint64(numBuckets), 8, &params, fingerprintValues)
-
-			timeStart := time.Now()
-			var sharedState pir.State
-			var serverState pir.State
-			var offlineMsg pir.Msg
-			if config.use_ntt == 1 {
-				seeds := pirInst.InitSeed(db.Info, params)
-				sharedState = pirInst.MakeState_fromSeeds(params, seeds)
-				serverState, offlineMsg = pirInst.FakeSetup_NTT(db, seeds, params)
+		for bucketIdx := 0; bucketIdx < numBuckets; bucketIdx++ {
+			if slot < len(buckets[bucketIdx]) {
+				fingerprintValues[bucketIdx] = uint64(buckets[bucketIdx][slot])
 			} else {
-				sharedState = pirInst.Init(db.Info, params)
-				serverState, offlineMsg = pirInst.Setup(db, sharedState, params)
+				fingerprintValues[bucketIdx] = 0
 			}
-			hintTime := time.Since(timeStart)
-			offlineComm := float64(offlineMsg.Size() * uint64(32) / (8.0 * 1024.0 * 1024.0))
+		}
 
-			resultChan <- struct {
-				index       int
-				database    *PIRDatabase
-				offlineComm float64
-				hintTime    time.Duration
-			}{
-				index: slot,
-				database: &PIRDatabase{
-					DB:          db,
-					Info:        db.Info,
-					Params:      params,
-					PIR:         pirInst,
-					SharedState: sharedState,
-					ServerState: serverState,
-					OfflineMsg:  offlineMsg,
-				},
-				offlineComm: offlineComm,
-				hintTime:    hintTime,
-			}
-		}(slot)
+		pirInst := &pir.SimplePIR{}
+		params := pirInst.PickParams(uint64(numBuckets), 8, 1<<11, 32)
+		db := pir.MakeDB(uint64(numBuckets), 8, &params, fingerprintValues)
+
+		timeStart := time.Now()
+		var sharedState pir.State
+		var serverState pir.State
+		var offlineMsg pir.Msg
+		if config.UseNTT == 1 {
+			seeds := pirInst.InitSeed(db.Info, params)
+			sharedState = pirInst.MakeState_fromSeeds(params, seeds)
+			serverState, offlineMsg = pirInst.FakeSetup_NTT(db, seeds, params)
+		} else {
+			sharedState = pirInst.Init(db.Info, params)
+			serverState, offlineMsg = pirInst.Setup(db, sharedState, params)
+		}
+		hintTime := time.Since(timeStart)
+		offlineComm := float64(offlineMsg.Size() * uint64(32) / (8.0 * 1024.0 * 1024.0))
+
+		results[slot] = struct {
+			index       int
+			database    *PIRDatabase
+			offlineComm float64
+			hintTime    time.Duration
+		}{
+			index: slot,
+			database: &PIRDatabase{
+				DB:          db,
+				Info:        db.Info,
+				Params:      params,
+				PIR:         pirInst,
+				SharedState: sharedState,
+				ServerState: serverState,
+				OfflineMsg:  offlineMsg,
+			},
+			offlineComm: offlineComm,
+			hintTime:    hintTime,
+		}
 	}
 
 	// 并行初始化value数据库 - 每个slot一个value数据库，按列优先存储
 	for slot := 0; slot < 4; slot++ {
-		wg.Add(1)
-		go func(slot int) {
-			defer wg.Done()
+		// 每个value数据库的大小为 numBuckets * valueChunks
+		totalValues := numBuckets * valueChunks
 
-			// 每个value数据库的大小为 numBuckets * valueChunks
-			totalValues := numBuckets * valueChunks
+		// 先选择参数
+		pirInst := &pir.SimplePIR{}
+		params := pirInst.PickParams(uint64(totalValues), 64, 1<<11, 32)
+		// params = pirInst.PickParams(uint64(params.L*params.M), 64, 1<<10, 32)
+		// fmt.Printf("\ntotalValues, p.L, p.M: %d, %d, %d\n",uint64(totalValues),params.L/7,params.M)
 
-			// 先选择参数
-			pirInst := &pir.SimplePIR{}
-			params := pirInst.PickParams(uint64(totalValues), 64, 1<<11, 32)
-			// params = pirInst.PickParams(uint64(params.L*params.M), 64, 1<<10, 32)
-			// fmt.Printf("\ntotalValues, p.L, p.M: %d, %d, %d\n",uint64(totalValues),params.L/7,params.M)
+		// 创建按列优先存储的数据数组
+		valueValues := make([]uint64, params.L/7*params.M)
 
-			// 创建按列优先存储的数据数组
-			valueValues := make([]uint64, params.L/7*params.M)
+		// 按列优先顺序填充数据
+		for bucketIdx := 0; bucketIdx < numBuckets; bucketIdx++ {
+			linearIndex := bucketIdx*bucketSize + slot
+			valueBytes := []byte(values[linearIndex])
+			for chunk := 0; chunk < valueChunks; chunk++ {
+				// 计算原始索引
+				originalIndex := bucketIdx*valueChunks + chunk
 
-			// 按列优先顺序填充数据
-			for bucketIdx := 0; bucketIdx < numBuckets; bucketIdx++ {
-				linearIndex := bucketIdx*bucketSize + slot
-				valueBytes := []byte(values[linearIndex])
-				for chunk := 0; chunk < valueChunks; chunk++ {
-					// 计算原始索引
-					originalIndex := bucketIdx*valueChunks + chunk
+				// 计算在列优先存储中的位置
+				col := originalIndex / int(params.L/7) // 列号
+				row := originalIndex % int(params.L/7) // 行号
+				storageIndex := row*int(params.M) + col
 
-					// 计算在列优先存储中的位置
-					col := originalIndex / int(params.L/7) // 列号
-					row := originalIndex % int(params.L/7) // 行号
-					storageIndex := row*int(params.M) + col
+				if storageIndex < len(valueValues) {
+					if linearIndex < len(values) && values[linearIndex] != "" {
+						// 将value分成多个chunk，每个chunk8字节
 
-					if storageIndex < len(valueValues) {
-						if linearIndex < len(values) && values[linearIndex] != "" {
-							// 将value分成多个chunk，每个chunk8字节
-
-							chunkStart := chunk * 8
-							chunkEnd := chunkStart + 8
-							if chunkEnd > len(valueBytes) {
-								chunkEnd = len(valueBytes)
-							}
-
-							// 提取当前chunk的字节
-							chunkBytes := make([]byte, 8)
-							if chunkStart < len(valueBytes) {
-								copy(chunkBytes, valueBytes[chunkStart:chunkEnd])
-							}
-
-							valueValues[storageIndex] = binary.BigEndian.Uint64(chunkBytes)
-						} else {
-							valueValues[storageIndex] = 0
+						chunkStart := chunk * 8
+						chunkEnd := chunkStart + 8
+						if chunkEnd > len(valueBytes) {
+							chunkEnd = len(valueBytes)
 						}
+
+						// 提取当前chunk的字节
+						chunkBytes := make([]byte, 8)
+						if chunkStart < len(valueBytes) {
+							copy(chunkBytes, valueBytes[chunkStart:chunkEnd])
+						}
+
+						valueValues[storageIndex] = binary.BigEndian.Uint64(chunkBytes)
+					} else {
+						valueValues[storageIndex] = 0
 					}
 				}
 			}
+		}
 
-			// 用填充好的数据创建数据库
-			db := pir.MakeDB(uint64(params.L/7*params.M), 64, &params, valueValues)
+		// 用填充好的数据创建数据库
+		db := pir.MakeDB(uint64(params.L/7*params.M), 64, &params, valueValues)
 
-			timeStart := time.Now()
-			var sharedState pir.State
-			var serverState pir.State
-			var offlineMsg pir.Msg
-			if config.use_ntt == 1 {
-				seeds := pirInst.InitSeed(db.Info, params)
-				sharedState = pirInst.MakeState_fromSeeds(params, seeds)
-				serverState, offlineMsg = pirInst.FakeSetup_NTT(db, seeds, params)
-			} else {
-				sharedState = pirInst.Init(db.Info, params)
-				serverState, offlineMsg = pirInst.Setup(db, sharedState, params)
-			}
-			hintTime := time.Since(timeStart)
+		timeStart := time.Now()
+		var sharedState pir.State
+		var serverState pir.State
+		var offlineMsg pir.Msg
+		if config.UseNTT == 1 {
+			seeds := pirInst.InitSeed(db.Info, params)
+			sharedState = pirInst.MakeState_fromSeeds(params, seeds)
+			serverState, offlineMsg = pirInst.FakeSetup_NTT(db, seeds, params)
+		} else {
+			sharedState = pirInst.Init(db.Info, params)
+			serverState, offlineMsg = pirInst.Setup(db, sharedState, params)
+		}
+		hintTime := time.Since(timeStart)
 
-			// 计算离线通信量
-			offlineComm := calculateMsgSize([]pir.Msg{offlineMsg})
+		// 计算离线通信量
+		offlineComm := calculateMsgSize([]pir.Msg{offlineMsg})
 
-			// 计算数据库索引: 4 (fingerprint DBs) + slot
-			dbIndex := 4 + slot
+		// 计算数据库索引: 4 (fingerprint DBs) + slot
+		dbIndex := 4 + slot
 
-			resultChan <- struct {
-				index       int
-				database    *PIRDatabase
-				offlineComm float64
-				hintTime    time.Duration
-			}{
-				index: dbIndex,
-				database: &PIRDatabase{
-					DB:          db,
-					Info:        db.Info,
-					Params:      params,
-					PIR:         pirInst,
-					SharedState: sharedState,
-					ServerState: serverState,
-					OfflineMsg:  offlineMsg,
-				},
-				offlineComm: offlineComm,
-				hintTime:    hintTime,
-			}
-		}(slot)
+		results[dbIndex] = struct {
+			index       int
+			database    *PIRDatabase
+			offlineComm float64
+			hintTime    time.Duration
+		}{
+			index: dbIndex,
+			database: &PIRDatabase{
+				DB:          db,
+				Info:        db.Info,
+				Params:      params,
+				PIR:         pirInst,
+				SharedState: sharedState,
+				ServerState: serverState,
+				OfflineMsg:  offlineMsg,
+			},
+			offlineComm: offlineComm,
+			hintTime:    hintTime,
+		}
 	}
-
-	// 等待所有goroutine完成
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
 
 	// 收集结果
 	var totalOfflineComm float64
 	var totalHintTime time.Duration
-	for result := range resultChan {
+	for _, result := range results {
 		databases[result.index] = result.database
 		totalOfflineComm += result.offlineComm
 		totalHintTime += result.hintTime
