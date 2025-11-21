@@ -6,19 +6,25 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+  font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: #f5f5f5;
+  line-height: 1.5;
 }
 
-/* 排除登录页：保持 flex 居中 */
+/* 登录页特殊处理 */
+.login-page {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+}
+
 .login-page body {
   display: flex !important;
   align-items: center;
   justify-content: center;
+  background: transparent !important;
 }
 
 .App {
@@ -27,17 +33,18 @@ body {
 
 /* 自定义滚动条 */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
   background: #f1f1f1;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb {
   background: #c1c1c1;
-  border-radius: 4px;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -46,25 +53,40 @@ body {
 
 /* 卡片阴影效果 */
 .ant-card {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   border-radius: 8px;
+  border: 1px solid #f0f0f0;
 }
 
 /* 按钮样式 */
 .ant-btn {
   border-radius: 6px;
+  font-weight: 500;
 }
 
-/* 表格样式 */
+/* 表格样式优化 */
 .ant-table-thead > tr > th {
   background-color: #fafafa;
   font-weight: 600;
+  color: #262626;
+  font-size: 13px;
+}
+
+.ant-table-tbody > tr > td {
+  font-size: 13px;
+  padding: 12px 8px;
+}
+
+.ant-table {
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 /* 统计卡片样式 */
 .ant-statistic-title {
   color: #666;
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .ant-statistic-content {
@@ -79,305 +101,146 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 20px;
 }
 
-/* 占位符样式 */
-.placeholder-bg {
-  background: linear-gradient(45deg, #f0f0f0 25%, transparent 25%), 
-              linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), 
-              linear-gradient(45deg, transparent 75%, #f0f0f0 75%), 
-              linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
-  background-size: 20px 20px;
-  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+/* 表单样式优化 */
+.ant-form-item-label > label {
+  font-weight: 500;
+  color: #262626;
 }
 
-/* 动画效果 */
-.fade-in {
-  animation: fadeIn 0.3s ease-in;
+.ant-input, .ant-input-number, .ant-select-selector {
+  border-radius: 6px !important;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.ant-modal-content {
+  border-radius: 8px;
 }
 
-/* 加载状态 */
-.loading-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 200px;
+.ant-modal-header {
+  border-radius: 8px 8px 0 0;
 }
 
-/* 错误状态 */
-.error-container {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  height: 200px;
-  color: #ff4d4f;
+/* 菜单样式优化 */
+.ant-menu-inline {
+  border-right: none !important;
 }
 
-/* 成功状态 */
-.success-container {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  height: 200px;
-  color: #52c41a;
+.ant-menu-item {
+  border-radius: 6px;
+  margin: 4px 8px !important;
+  width: auto !important;
 }
 
-/* 表单项宽度：防窄瘦（系统设置用） */
-.ant-form-item {
-  width: 100% !important;
-  margin-bottom: 16px !important;
+.ant-menu-item-selected {
+  background-color: #e6f7ff !important;
 }
 
-.ant-form-item p {
-  width: 100% !important;
-  padding: 0 8px !important;
-  word-break: break-word !important;
-}
-
-/* 响应式设计（增强版：多断点 + 修复白屏） */
-/* 大桌面：>1200px，宽松布局 */
-@media (min-width: 1200px) {
-  body {
-    display: block !important;
-  }
-  
-  .App {
-    display: block;
-    min-height: 100vh;
-  }
-
-  .ant-layout {
-    height: 100vh !important;
-    flex-direction: row !important;
-  }
-  
+/* 响应式设计优化 */
+@media (max-width: 1200px) {
   .ant-layout-sider {
-    width: 200px !important;
-    min-width: 200px !important;
-    max-width: 200px !important;
-    flex: 0 0 200px !important;
     position: fixed !important;
-    left: 0 !important;
-    top: 0 !important;
-    height: 100vh !important;
-    z-index: 1000 !important;
-    overflow-y: auto !important;
-  }
-  
-  .ant-layout-header {
-    position: fixed !important;
-    left: 200px !important;
-    right: 0 !important;
-    z-index: 999 !important;
-    height: 64px !important;
-  }
-  
-  .ant-layout-content {
-    margin-left: 200px !important;
-    margin-top: 64px !important;
-    padding: 32px !important;
-    height: calc(100vh - 64px) !important;
-    overflow-y: auto !important;
-    background-color: #f5f5f5 !important;
-  }
-  
-  .ant-layout-sider-trigger {
-    display: none !important;
-  }
-  
-  .ant-row .ant-col {
-    flex: 0 0 25% !important;
-    max-width: 25% !important;
-  }
-}
-
-/* 中等桌面：992-1200px，压缩但舒适 */
-@media (min-width: 992px) and (max-width: 1200px) {
-  .ant-layout-content {
-    padding: 24px !important;
-  }
-  
-  .ant-row .ant-col {
-    flex: 0 0 33.33% !important;
-    max-width: 33.33% !important;
-  }
-  
-  .ant-layout-sider {
-    width: 180px !important;
-    min-width: 180px !important;
-  }
-  
-  .ant-layout-content,
-  .ant-layout-header {
-    left: 180px !important;
-    margin-left: 180px !important;
-  }
-}
-
-/* 小桌面/平板：768-992px，紧凑布局 */
-@media (min-width: 768px) and (max-width: 992px) {
-  .ant-layout-content {
-    padding: 16px !important;
-  }
-  
-  .ant-row .ant-col {
-    flex: 0 0 50% !important;
-    max-width: 50% !important;
-  }
-  
-  .ant-menu-inline-collapsed {
-    width: 80px !important;
-  }
-}
-
-/* 手机端：768px 以下，Sider 隐藏，Content 全屏（防白屏） */
-@media (max-width: 768px) {
-  body {
-    display: block !important;
-  }
-  
-  .ant-layout-sider {
-    width: 0 !important;
-    min-width: 0 !important;
-    padding: 0 !important;
-    transform: translateX(-100%);  /* 滑出隐藏 */
-    transition: transform 0.3s;
-  }
-  
-  .ant-layout-content {
-    margin-left: 0 !important;  /* 清零，防白屏 */
-    margin-top: 0 !important;
-    padding: 12px !important;
-    width: 100% !important;
-  }
-  
-  .ant-layout-header {
-    left: 0 !important;
-    padding: 0 12px !important;
-    position: relative !important;
-  }
-  
-  .ant-row .ant-col {
-    flex: 0 0 100% !important;
-    max-width: 100% !important;
-  }
-  
-  .ant-layout-sider-trigger {
-    display: block !important;
-    position: fixed;
     left: 0;
-    top: 64px;
-    z-index: 1001;
-  }
-  
-  /* 登录页特殊：保持原 flex */
-  .login-background {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-  }
-  
-  .login-background .ant-form-item {
-    width: 100% !important;  /* 输入框宽，防小窗格 */
-    max-width: 500px !important;
-  }
-}
-
-/* 通用：防止溢出 */
-.ant-layout-content {
-  overflow-x: auto;
-}
-/* 登录表单：输入框宽敞（修复小窗格） */
-.login-background .ant-form {
-  width: 100% !important;
-  max-width: 400px !important;  /* 全屏时限宽，避免拉太长 */
-  padding: 20px !important;
-}
-
-.login-background .ant-form-item {
-  width: 100% !important;
-  margin-bottom: 16px !important;
-}
-
-.login-background .ant-input {
-  width: 100% !important;
-  padding: 12px !important;  /* 更高输入区 */
-  font-size: 16px !important;  /* 更大字体 */
-}
-
-/* 小窗口菜单按钮：浮动 hamburger */
-@media (max-width: 768px) {
-  .menu-trigger {
-    position: fixed !important;
-    left: 12px !important;
-    top: 70px !important;  /* 避开 Header */
-    z-index: 1002 !important;
-    background: #1890ff !important;
-    color: white !important;
-    border: none !important;
-    width: 48px !important;
-    height: 48px !important;
-    border-radius: 50% !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
-  }
-  
-  .menu-trigger:hover {
-    background: #40a9ff !important;
-  }
-  
-  /* Sider 弹出时覆盖 */
-  .ant-drawer-content {
-    width: 280px !important;  /* 菜单宽 */
+    top: 0;
+    height: 100vh;
+    z-index: 1000;
   }
   
   .ant-layout-content {
     margin-left: 0 !important;
-    margin-top: 64px !important;  /* Header 后 */
-    padding: 12px !important;
-    width: 100% !important;
   }
   
-  /* 其他保持 */
-  .ant-layout-sider {
-    width: 0 !important;
-    min-width: 0 !important;
-    padding: 0 !important;
-    transform: translateX(-100%) !important;
-    transition: transform 0.3s !important;
+  .ant-layout-header {
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 999;
   }
   
-  .ant-row .ant-col {
-    flex: 0 0 100% !important;
-    max-width: 100% !important;
+  .ant-layout-content {
+    margin-top: 64px !important;
   }
 }
-/* =========================
-   Fix: responsive shrink & prevent white-narrow column when DevTools docks
-   Append this to the end of your app.css
-   ========================= */
 
-/* 1) allow flex children to shrink (critical) */
+@media (max-width: 768px) {
+  .ant-layout-content {
+    margin: 16px !important;
+    padding: 16px !important;
+  }
+  
+  .ant-card {
+    margin-bottom: 16px;
+  }
+  
+  .ant-table {
+    font-size: 12px;
+  }
+}
+
+/* 紧凑模式优化 */
+body.layout-compact .ant-layout-sider {
+  width: 72px !important;
+  min-width: 72px !important;
+}
+
+body.layout-compact .ant-menu-item {
+  padding: 0 12px !important;
+}
+
+/* 防止文本溢出 */
+.ant-typography {
+  word-break: break-word;
+}
+
+.ant-table-cell {
+  word-break: break-word;
+}
+
+/* 输入框在Ubuntu下的优化 */
+.ant-input, .ant-input-number-input, .ant-select-selector {
+  font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
+/* 数字输入框宽度修复 */
+.ant-input-number {
+  width: 100% !important;
+}
+
+/* 表格操作列按钮间距 */
+.ant-table-cell .ant-space {
+  gap: 4px !important;
+}
+
+.ant-table-cell .ant-btn-sm {
+  padding: 0 8px;
+  height: 28px;
+  font-size: 12px;
+}
+
+/* 模态框表单间距 */
+.ant-form-vertical .ant-form-item {
+  margin-bottom: 20px;
+}
+
+/* 卡片标题样式 */
+.ant-card-head-title {
+  font-weight: 600;
+  color: #262626;
+}
+
+/* 统计数字卡片hover效果 */
+.ant-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  transition: box-shadow 0.3s ease;
+}
+
+/* 确保所有容器可收缩 */
 html, body, #root, .App, .ant-layout, .ant-layout > * {
   min-width: 0 !important;
 }
 
-/* ensure sider/header/content also allow shrink */
 .ant-layout-sider,
 .ant-layout-header,
 .ant-layout-content,
@@ -385,154 +248,18 @@ html, body, #root, .App, .ant-layout, .ant-layout > * {
   min-width: 0 !important;
 }
 
-/* 2) prevent long words / strings from forcing width */
-*,
-*::before,
-*::after {
-  overflow-wrap: anywhere !important;
-  word-break: break-word !important;
+/* 保护性文本处理 */
+* {
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
-/* 3) make content scroll horizontally if necessary rather than breaking layout */
+/* 内容区域滚动 */
 .ant-layout-content {
   overflow-x: auto !important;
 }
 
-/* 4) safe defaults for table/card components */
+/* 安全组件默认 */
 .ant-table, .ant-card, .ant-form-item {
   min-width: 0 !important;
 }
-
-/* 5) Mid-size / devtools-docked fix:
-   When viewport is narrower (DevTools docks), don't keep left-offset layout.
-   This overrides the fixed-left sider+header margin rules and lets content occupy remaining width.
-*/
-@media (max-width: 1200px) {
-  /* make sider participate in normal flow (not fixed) so content won't be offset by left margin) */
-  .ant-layout-sider {
-    position: relative !important;
-    left: auto !important;
-    top: auto !important;
-    height: auto !important;
-    width: 80px !important;         /* keep compact width on medium screens */
-    min-width: 80px !important;
-    transform: none !important;
-    flex: 0 0 80px !important;
-  }
-
-  /* remove header/content left offsets so content uses full available width */
-  .ant-layout-header {
-    left: 0 !important;
-    right: 0 !important;
-    width: auto !important;
-    position: relative !important;
-    z-index: 10 !important;
-  }
-
-  .ant-layout-content {
-    margin-left: 0 !important;
-    margin-top: 64px !important;   /* keep room for header */
-    padding: 16px !important;
-    height: auto !important;
-  }
-
-  /* reduce column widths to avoid overflow on medium viewports */
-  .ant-row .ant-col {
-    flex: 0 0 50% !important;
-    max-width: 50% !important;
-  }
-}
-
-/* 6) Small adjustments at slightly larger width (prevent side-bar from breaking layout
-   when DevTools or other panels make available width slightly less than large breakpoint) */
-@media (max-width: 1400px) and (min-width: 1201px) {
-  .ant-layout-sider {
-    /* use a smaller fixed width to avoid pushing content too far right */
-    width: 160px !important;
-    min-width: 160px !important;
-    flex: 0 0 160px !important;
-  }
-
-  .ant-layout-content {
-    margin-left: 160px !important;
-    margin-top: 64px !important;
-    padding: 20px !important;
-  }
-}
-
-/* 7) If you want a quick dev-time helper: show outlines to debug which element forces width */
-/* Uncomment while debugging: */
-/*
-* { outline: 1px dashed rgba(0,0,0,0.05); }
-.ant-layout-sider { outline: 2px solid rgba(24,144,255,0.15); }
-*/
-/* 持久修复 - 依赖 AdminDashboard 中对 body 添加 .layout-compact */
-body.layout-compact .ant-layout-sider {
-  position: relative !important;
-  left: auto !important;
-  top: auto !important;
-  transform: none !important;
-  width: 72px !important;
-  min-width: 72px !important;
-  flex: 0 0 72px !important;
-  overflow: hidden !important;
-}
-
-body.layout-compact .ant-layout-header {
-  position: relative !important;
-  left: 0 !important;
-  right: 0 !important;
-  width: auto !important;
-  z-index: 10 !important;
-}
-
-body.layout-compact .ant-layout-content {
-  margin-left: 0 !important;
-  margin-top: 64px !important;
-  padding: 12px !important;
-  height: auto !important;
-  overflow-x: auto !important;
-}
-
-/* 确保所有关键容器可收缩 */
-body.layout-compact, body.layout-compact .ant-layout, body.layout-compact .ant-layout > * {
-  min-width: 0 !important;
-}
-
-/* 减小菜单项文字与 icon 间距（在紧凑模式避免换行） */
-body.layout-compact .ant-menu-inline .ant-menu-item {
-  padding-left: 12px !important;
-  padding-right: 12px !important;
-  white-space: nowrap !important;
-  text-overflow: ellipsis !important;
-  overflow: hidden !important;
-}
-/* 防止折叠时菜单文字换行（确保单行且被隐藏） */
-.ant-menu-inline-collapsed .ant-menu-item, 
-.ant-menu-inline-collapsed .ant-menu-title-content {
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-}
-
-/* 确保菜单项内文本在 collapsed 模式不占据多行 */
-.ant-menu-inline .ant-menu-item .ant-menu-title-content {
-  display: inline-block;
-  vertical-align: middle;
-  line-height: 1 !important;
-}
-
-/* 保护性：在折叠时隐藏过长文本（AntD 会显示 tooltip） */
-.ant-menu-inline-collapsed .ant-menu-item .ant-menu-title-content {
-  visibility: hidden !important; /* 图标仍可见，tooltip 可显示文字 */
-}
-
-/* 使图标和 tooltip 对齐（可选微调） */
-.ant-menu-inline-collapsed .ant-menu-item .anticon {
-  margin-right: 0 !important;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-
