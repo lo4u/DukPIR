@@ -15,6 +15,14 @@ body {
   line-height: 1.5;
 }
 
+#root {
+  flex: 1;
+}
+
+.ant-layout-header.css-dev-only-do-not-override-198drv2 {
+  width: auto !important;
+}
+
 /* 登录页特殊处理 */
 .login-page {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
