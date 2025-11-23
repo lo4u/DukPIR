@@ -16,13 +16,14 @@ def run_test(db_size, key_len, p_worse, querypop, use_ntt, only_offline, test_na
     print(f"\n{'='*80}")
     print(f"开始测试: {test_name}")
     print(f"时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"参数: db_size={db_size}, key_len={key_len}, p_worse={p_worse}, querypop={querypop}")
+    print(f"参数: db_size={db_size}, key_len={key_len}, p_worse={p_worse}, querypop={querypop}, ntt={use_ntt}, only_offline={only_offline}")
     print(f"{'='*80}")
     
     for i in range(1, run_count + 1):
         print(f"\n{'-'*60}")
         print(f"第 {i} 次运行:")
         print(f"{'-'*60}")
+        sys.stdout.flush()
         
         # 构建命令参数
         cmd = ['./production-app', '-n', str(db_size), '-l', str(key_len), 
@@ -105,6 +106,22 @@ def test_suite_ntt():
     for db_size in db_sizes:
       test_name = f"NTT_db{db_size}_len{key_len}"
       run_test(db_size, key_len, 0, 1, use_ntt, only_offline, test_name)
+
+def test_suite_no_ntt():
+    """
+    测试套件ntt_对比: 无NTT离线阶段测试
+    """
+    print("开始测试无NTT")
+    print("无NTT离线阶段相关性能测试")
+
+    db_sizes = [2**16, 2**17, 2**18, 2**19, 2**20]
+    key_len = 1024  # 1KB
+    use_ntt = 0
+    only_offline = 1
+
+    for db_size in db_sizes:
+      test_name = f"NTT_db{db_size}_len{key_len}"
+      run_test(db_size, key_len, 0, 1, use_ntt, only_offline, test_name)
 def main():
     """
     主函数
@@ -121,7 +138,7 @@ def main():
     # test_suite_b()
 
     # 运行测试套件NTT
-    test_suite_ntt()
+    test_suite_no_ntt()
     
     end_time = datetime.datetime.now()
     duration = end_time - start_time
