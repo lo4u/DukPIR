@@ -2394,7 +2394,7 @@ func main() {
 	admin := router.Group("/admin")
 	admin.Use(apiHandler.AuthMiddleware(), apiHandler.AdminMiddleware())
 	{
-		// 记录管理
+		// 数据管理
 		admin.POST("/records", apiHandler.AddRecord)
 		admin.PUT("/records/:key", apiHandler.UpdateRecord)
 		admin.DELETE("/records/:key", apiHandler.DeleteRecord)
@@ -6182,7 +6182,7 @@ func main() {
 	admin := router.Group("/admin")
 	admin.Use(apiHandler.AuthMiddleware(), apiHandler.AdminMiddleware())
 	{
-		// 记录管理
+		// 数据管理
 		admin.POST("/records", apiHandler.AddRecord)
 		admin.PUT("/records/:key", apiHandler.UpdateRecord)
 		admin.DELETE("/records/:key", apiHandler.DeleteRecord)
@@ -6348,7 +6348,7 @@ func main() {
 	admin := router.Group("/admin")
 	admin.Use(apiHandler.AuthMiddleware(), apiHandler.AdminMiddleware())
 	{
-		// 记录管理
+		// 数据管理
 		admin.POST("/records", apiHandler.AddRecord)
 		admin.PUT("/records/:key", apiHandler.UpdateRecord)
 		admin.DELETE("/records/:key", apiHandler.DeleteRecord)
@@ -8732,7 +8732,7 @@ export const systemAPI = {
 
 // 管理员API
 export const adminAPI = {
-  // 记录管理
+  // 数据管理
   addRecord: (record) => api.post('/admin/records', record),
   updateRecord: (key, record) => api.put(`/admin/records/${key}`, record),
   deleteRecord: (key) => api.delete(`/admin/records/${key}`),
@@ -9319,7 +9319,7 @@ const AdminDashboard = () => {
       case 'records':
         return (
           <Card
-            title="记录管理"
+            title="数据管理"
             extra={
               <Button type="primary" icon={<PlusOutlined />} onClick={handleAddRecord}>
                 添加记录
@@ -9384,7 +9384,7 @@ const AdminDashboard = () => {
             仪表板
           </Menu.Item>
           <Menu.Item key="records" icon={<DatabaseOutlined />}>
-            记录管理
+            数据管理
           </Menu.Item>
           <Menu.Item key="users" icon={<UserOutlined />}>
             用户管理
@@ -10211,7 +10211,7 @@ frontend-web/
 ### 管理员功能
 
 - **仪表板**: 系统概览和统计信息
-- **记录管理**: 添加、编辑、删除PIR记录
+- **数据管理**: 添加、编辑、删除PIR记录
 - **用户管理**: 查看和管理用户账户
 - **系统配置**: 设置p_worse值等系统参数
 - **数据备份**: 执行数据备份操作
@@ -10614,7 +10614,7 @@ cd frontend-web
 
 ### 管理员界面
 - 仪表板：系统概览和统计
-- 记录管理：增删改查PIR记录
+- 数据管理：增删改查PIR记录
 - 用户管理：查看和管理用户
 - 系统配置：设置p_worse等参数
 
@@ -10715,7 +10715,7 @@ frontend-web/
 2. **管理员界面** ✅
    - 侧边栏导航
    - 仪表板统计
-   - 记录管理（增删改查）
+   - 数据管理（增删改查）
    - 用户管理
    - 系统配置（p_worse设置）
    - 数据备份功能
@@ -10928,7 +10928,7 @@ func main() {
 	admin := router.Group("/admin")
 	admin.Use(apiHandler.AuthMiddleware(), apiHandler.AdminMiddleware())
 	{
-		// 记录管理
+		// 数据管理
 		admin.POST("/records", apiHandler.AddRecord)
 		admin.PUT("/records/:key", apiHandler.UpdateRecord)
 		admin.DELETE("/records/:key", apiHandler.DeleteRecord)
@@ -11120,7 +11120,7 @@ func main() {
 	admin := router.Group("/admin")
 	admin.Use(apiHandler.AuthMiddleware(), apiHandler.AdminMiddleware())
 	{
-		// 记录管理
+		// 数据管理
 		admin.POST("/records", apiHandler.AddRecord)
 		admin.PUT("/records/:key", apiHandler.UpdateRecord)
 		admin.DELETE("/records/:key", apiHandler.DeleteRecord)
@@ -11318,7 +11318,7 @@ func main() {
 	admin := router.Group("/admin")
 	admin.Use(apiHandler.AuthMiddleware(), apiHandler.AdminMiddleware())
 	{
-		// 记录管理
+		// 数据管理
 		admin.POST("/records", apiHandler.AddRecord)
 		admin.PUT("/records/:key", apiHandler.UpdateRecord)
 		admin.DELETE("/records/:key", apiHandler.DeleteRecord)
@@ -12331,7 +12331,7 @@ echo
 echo "验证步骤:"
 echo "1. 启动服务后，检查控制台输出是否显示正确的数据库信息"
 echo "2. 登录管理员账户"
-echo "3. 查看记录管理页面，确认记录数量符合预期"
+echo "3. 查看数据管理页面，确认记录数量符合预期"
 echo "4. 尝试查询一些记录，验证功能正常"
 echo
 
@@ -12501,7 +12501,7 @@ cd frontend-web
 
 ### 管理员界面
 - 仪表板：系统概览和统计
-- 记录管理：增删改查PIR记录
+- 数据管理：增删改查PIR记录
 - 用户管理：查看和管理用户
 - 系统配置：设置p_worse等参数
 
@@ -12728,7 +12728,7 @@ cd frontend-web
 
 ### 管理员界面
 - 仪表板：系统概览和统计
-- 记录管理：增删改查PIR记录
+- 数据管理：增删改查PIR记录
 - 用户管理：查看和管理用户
 - 系统配置：设置p_worse等参数
 
@@ -13513,7 +13513,7 @@ const AdminDashboard = () => {
       case 'records':
         return (
           <Card
-            title="记录管理"
+            title="数据管理"
             extra={
               <Button type="primary" icon={<PlusOutlined />} onClick={handleAddRecord}>
                 添加记录
@@ -13578,7 +13578,7 @@ const AdminDashboard = () => {
             仪表板
           </Menu.Item>
           <Menu.Item key="records" icon={<DatabaseOutlined />}>
-            记录管理
+            数据管理
           </Menu.Item>
           <Menu.Item key="users" icon={<UserOutlined />}>
             用户管理
@@ -13961,7 +13961,7 @@ const AdminDashboard = () => {
       case 'records':
         return (
           <Card
-            title="记录管理"
+            title="数据管理"
             extra={
               <Button type="primary" icon={<PlusOutlined />} onClick={handleAddRecord}>
                 添加记录
@@ -14026,7 +14026,7 @@ const AdminDashboard = () => {
             仪表板
           </Menu.Item>
           <Menu.Item key="records" icon={<DatabaseOutlined />}>
-            记录管理
+            数据管理
           </Menu.Item>
           <Menu.Item key="users" icon={<UserOutlined />}>
             用户管理
@@ -15890,7 +15890,7 @@ func main() {
 	admin := router.Group("/admin")
 	admin.Use(apiHandler.AuthMiddleware(), apiHandler.AdminMiddleware())
 	{
-		// 记录管理
+		// 数据管理
 		admin.POST("/records", apiHandler.AddRecord)
 		admin.PUT("/records/:key", apiHandler.UpdateRecord)
 		admin.DELETE("/records/:key", apiHandler.DeleteRecord)
@@ -16200,7 +16200,7 @@ func main() {
 	admin := router.Group("/admin")
 	admin.Use(apiHandler.AuthMiddleware(), apiHandler.AdminMiddleware())
 	{
-		// 记录管理
+		// 数据管理
 		admin.POST("/records", apiHandler.AddRecord)
 		admin.PUT("/records/:key", apiHandler.UpdateRecord)
 		admin.DELETE("/records/:key", apiHandler.DeleteRecord)

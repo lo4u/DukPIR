@@ -60,7 +60,7 @@ export const systemAPI = {
 
 // 管理员API
 export const adminAPI = {
-  // 记录管理
+  // 数据管理
   addRecord: (record) => api.post('/admin/records', record),
   updateRecord: (key, record) => api.put(`/admin/records/${key}`, record),
   deleteRecord: (key) => api.delete(`/admin/records/${key}`),

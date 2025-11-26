@@ -189,7 +189,7 @@ func (ps *PIRService) ourPIROffline(config Config) (*OurPIRSystem, *PerformanceS
 	} else {
 		fmt.Printf("文件路径为空，使用随机生成\n")
 		db = ps.generateRandomDB(config.NumRows, config.KeyLen)
-		fmt.Println("没有成功捏")
+		fmt.Println("没有成功")
 	}
 
 	fmt.Printf("总记录数: %d\n", len(db.Records))
@@ -310,7 +310,7 @@ func (ps *PIRService) ourPIROnline(system *OurPIRSystem, queryKey string, pWorse
 		fmt.Printf("警告: Key %s 在选定数据库中未找到\n", queryKey)
 		return false, ""
 	}
-	
+
 	// 获取位置
 	bucketPow := filter.GetBucketPow()
 	i1, fp := cf.GetIndexAndFingerprint([]byte(queryKey), bucketPow)

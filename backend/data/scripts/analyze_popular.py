@@ -41,11 +41,11 @@ def analyze_popular(records, rate=0.1):
         print(f"  ... (剩余 {len(non_popular) - 5} 条非热门记录已保存到文件)")
     
     # 保存完整列表到文件
-    with open('popular_records.txt', 'w') as f:
+    with open('../popular_records.txt', 'w') as f:
         f.write("# 热门记录 (高概率前10%)\n")
         for rec in popular:
             f.write(f"{rec['key']} {rec['value']} {rec['probability']:.6f}\n")
-    with open('non_popular_records.txt', 'w') as f:
+    with open('../non_popular_records.txt', 'w') as f:
         f.write("# 非热门记录\n")
         for rec in non_popular:
             f.write(f"{rec['key']} {rec['value']} {rec['probability']:.6f}\n")
@@ -53,7 +53,7 @@ def analyze_popular(records, rate=0.1):
     print(f"\n完整详细列表已保存: popular_records.txt (热门 {popular_count} 条), non_popular_records.txt (非热门 {len(non_popular)} 条)")
 
 if __name__ == "__main__":
-    file_path = './data/records.txt'
+    file_path = '../my_db.txt'
     records = load_records(file_path)
     if not records:
         print("错误: 无记录加载，请检查文件。")

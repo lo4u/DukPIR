@@ -181,6 +181,11 @@ func ourPIROffline(config Config) (*OurPIRSystem, *PerformanceStats) {
 		popularDB = selectByRate(db, config.RateOfPop)
 		fmt.Printf("Selected %d records by rate %.3f\n",
 			len(popularDB.Records), config.RateOfPop)
+		P_pop := float64(0)
+		for i := 0; i < len(popularDB.Records); i++ {
+			P_pop += popularDB.Records[i].Probability
+		}
+		fmt.Printf("热门数据库总概率为：%.3f\n", P_pop)
 	}
 
 	// 随机选择查询key

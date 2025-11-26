@@ -409,9 +409,9 @@ const SettingsPanel = ({ pWorse, handlePWorseChange, stats, handleBackup }) => {
               <Col xs={24} sm={12}>
                 <Form.Item
                   name="p_worse"
-                  label="最坏出错概率"
+                  label="最坏情况正确概率"
                   rules={[
-                    { required: true, message: '请输入最坏出错概率' },
+                    { required: true, message: '请输入最坏情况正确概率' },
                     { type: 'number', min: 0, max: 1, message: '概率必须在0~1之间' }
                   ]}
                 >

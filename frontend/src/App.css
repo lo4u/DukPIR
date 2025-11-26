@@ -142,7 +142,7 @@ body {
 }
 
 .ant-menu-item-selected {
-  background-color: #e6f7ff !important;
+  background-color: #8ed1fc !important;
 }
 
 /* 响应式设计优化 */
@@ -270,4 +270,8 @@ html, body, #root, .App, .ant-layout, .ant-layout > * {
 /* 安全组件默认 */
 .ant-table, .ant-card, .ant-form-item {
   min-width: 0 !important;
+}
+
+main.ant-layout-content.css-dev-only-do-not-override-1cj4ms {
+  margin: 80px 70px 70px !important;
 }

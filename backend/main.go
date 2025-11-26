@@ -136,7 +136,7 @@ func main() {
 	admin := router.Group("/admin")
 	admin.Use(apiHandler.AuthMiddleware(), apiHandler.AdminMiddleware())
 	{
-		// 记录管理
+		// 数据管理
 		admin.POST("/records", apiHandler.AddRecord)
 		admin.PUT("/records/:key", apiHandler.UpdateRecord)
 		admin.DELETE("/records/:key", apiHandler.DeleteRecord)
