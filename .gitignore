@@ -1,5 +1,9 @@
+#FILE
 *.txt
 *.csv
 *.log
+*.input
+*.output
+*.env
+*.jar
 production-app
-ddpir

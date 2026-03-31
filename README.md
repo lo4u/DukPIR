@@ -52,3 +52,45 @@ key2 value2 0.25
 key3 value3 0.09
 key4 value4 0.01
 ```
+
+---
+
+## Baseline 测试
+
+本项目包含用于性能对比的 baseline 实现 `baseline/mpc4j`（[alibaba-edu/mpc4j](https://github.com/alibaba-edu/mpc4j) 的修复版本）。
+
+### 编译
+
+```bash
+cd baseline/mpc4j
+mvn clean install \
+  -Dos.detected.classifier=linux-x86_64 \
+  -Dmaven.compiler.source=21 \
+  -Dmaven.compiler.target=21 \
+  -DskipTests
+```
+
+⚠️ `-Dos.detected.classifier=linux-x86_64` 必须指定。配置参考 `~/workspace/docker/dockerfile_template`。
+
+### 运行
+
+```bash
+# 终端 1: Server
+java --add-modules=jdk.incubator.vector --enable-preview \
+  -cp mpc4j-s2pc-pir/target/mpc4j-s2pc-pir-1.1.4-beta-jar-with-dependencies.jar \
+  edu.alibaba.mpc4j.s2pc.pir.main.PirMain \
+  kspir_test.conf server
+
+# 终端 2: Client
+java --add-modules=jdk.incubator.vector --enable-preview \
+  -cp mpc4j-s2pc-pir/target/mpc4j-s2pc-pir-1.1.4-beta-jar-with-dependencies.jar \
+  edu.alibaba.mpc4j.s2pc.pir.main.PirMain \
+  kspir_test.conf client
+```
+
+⚠️ `--add-modules=jdk.incubator.vector` 必须添加。
+
+### Bug 修复
+
+本版本修复了原始 mpc4j 的文件路径 bug (`FileNotFoundException: temp/BYTES_CLIENT_BYTES_CLIENT_32.input`)。
+
