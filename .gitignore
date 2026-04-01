@@ -1,2 +1,16 @@
 *.txt
 .vscode/
+
+# Dependencies - never commit node_modules
+node_modules/
+
+# Build artifacts
+frontend/dist/
+backend/ddpir-backend
+
+# Go build output
+*.exe
+*.out
+
+# macOS
+.DS_Store
