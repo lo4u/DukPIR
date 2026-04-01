@@ -56,14 +56,14 @@ run_one_conf() {
 
   echo "[RUN] $conf_base"
 
-  java --add-modules=jdk.incubator.vector --enable-preview \
+  java -Xmx64g -Xms64g --add-modules=jdk.incubator.vector --enable-preview \
     -jar "$JAR_PATH" "$conf" server \
     > "$LOG_DIR/${label}.server.log" 2>&1 &
   server_pid=$!
 
   sleep 3
 
-  java --add-modules=jdk.incubator.vector --enable-preview \
+  java -Xmx64g -Xms64g --add-modules=jdk.incubator.vector --enable-preview \
     -jar "$JAR_PATH" "$conf" client \
     > "$LOG_DIR/${label}.client.log" 2>&1
 

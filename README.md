@@ -94,3 +94,13 @@ java --add-modules=jdk.incubator.vector --enable-preview \
 
 本版本修复了原始 mpc4j 的文件路径 bug (`FileNotFoundException: temp/BYTES_CLIENT_BYTES_CLIENT_32.input`)。
 
+## Baseline：chalametPIR
+
+编译：
+PIR_LWE_DIM=1024 \
+PIR_ELEM_SIZE_BITS=1024 \
+PIR_NUMBER_OF_ELEMENTS_EXP=5 \
+PIR_PLAINTEXT_BITS=8 \
+BENCH_DB_GEN=true \
+BENCH_KV=true \
+cargo bench --bench bench
