@@ -30,6 +30,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     let kv_db_eles = bench_utils::generate_kv_db_elems(m, (elem_size + 7) / 8);
     let keys: Vec<String> = kv_db_eles.iter().map(|e| e.0.clone()).collect();
     let values: Vec<String> = kv_db_eles.iter().map(|e| e.1.clone()).collect();
+    let _start_offline = std::time::Instant::now();
     let shard = KVShard::from_base64_strings(
       &keys,
       &values,
@@ -39,6 +40,7 @@ fn criterion_benchmark(c: &mut Criterion) {
       plaintext_bits,
     )
     .unwrap();
+    let offline_duration = _start_offline.elapsed();
     println!("[KV] Setup complete, starting benchmarks...");
 
     println!("[KV] Benchmarking online steps...");
@@ -46,6 +48,7 @@ fn criterion_benchmark(c: &mut Criterion) {
       &mut lwe_group,
       &shard,
       (keys[0].clone(), values[0].clone()),
+      offline_duration,
     );
 
     if offline {
@@ -56,6 +59,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     }
   } else {
     let db_eles = bench_utils::generate_db_eles(m, (elem_size + 7) / 8);
+    let _start_offline = std::time::Instant::now();
     let shard = Shard::from_base64_strings(
       &db_eles,
       lwe_dim,
@@ -64,10 +68,11 @@ fn criterion_benchmark(c: &mut Criterion) {
       plaintext_bits,
     )
     .unwrap();
+    let offline_duration = _start_offline.elapsed();
     println!("[I] Setup complete, starting benchmarks");
 
     println!("[I] Benchmarking online steps...");
-    _bench_client_query(&mut lwe_group, &shard);
+    _bench_client_query(&mut lwe_group, &shard, offline_duration);
 
     if offline {
       println!("[I] Benchmarking offline steps...");
@@ -174,6 +179,7 @@ fn _bench_kv_db_generation(
 fn _bench_client_query(
   c: &mut BenchmarkGroup<criterion::measurement::WallTime>,
   shard: &Shard,
+  offline_duration: std::time::Duration,
 ) {
   let db = shard.get_db();
   let bp = shard.get_base_params();
@@ -181,10 +187,60 @@ fn _bench_client_query(
   let w = db.get_row_width_self();
   let idx = 10;
 
+  let offline_base_params_bytes = bincode::serialize(bp).unwrap().len();
+  let offline_rhs_hint_bytes = bincode::serialize(bp.get_rhs()).unwrap().len();
+  let offline_public_seed_bytes =
+    bincode::serialize(&bp.get_public_seed()).unwrap().len();
+  let offline_min_payload_bytes =
+    offline_rhs_hint_bytes + offline_public_seed_bytes;
+  println!(
+    "[I] Communication bytes (offline): base_params(total): {}, rhs_hint(A*DB): {}, public_seed(for deriving A): {}",
+    offline_base_params_bytes,
+    offline_rhs_hint_bytes,
+    offline_public_seed_bytes
+  );
+  println!(
+    "[I] Communication bytes (offline, minimal payload): {}",
+    offline_min_payload_bytes
+  );
+
   println!("Starting client query benchmarks");
   let mut _qp = generate_index_query_params(&cp, bp).unwrap();
   let _q = _qp.generate_query(idx).unwrap();
   let mut _resp = shard.respond(&_q).unwrap();
+  let query_bytes = bincode::serialize(&_q).unwrap().len();
+  let response_bytes = _resp.len();
+  println!(
+    "[I] Communication bytes (online): query: {}, response: {}, total: {}",
+    query_bytes,
+    response_bytes,
+    query_bytes + response_bytes
+  );
+
+  println!("Offline Comm Bytes: {}", offline_min_payload_bytes);
+  println!("Online Query Bytes: {}", query_bytes);
+  println!("Online Response Bytes: {}", response_bytes);
+  println!("Offline Setup Time: {:?}", offline_duration);
+
+  // Add an end-to-end benchmark to get real statistical online time
+  c.bench_function(
+    format!(
+      "[I] online end-to-end, lwe_dim: {}, m: {}, omega: {}",
+      bp.get_dim(),
+      db.get_matrix_height(),
+      w
+    ),
+    |b| {
+      b.iter(|| {
+        _qp.used = false;
+        let q = _qp.generate_query(idx).unwrap();
+        let resp = shard.respond(&q).unwrap();
+        let deser: Response = bincode::deserialize(&resp).unwrap();
+        _qp.parse_resp_as_base64(&deser);
+      });
+    },
+  );
+
   c.bench_function(
     format!(
       "create client query params, lwe_dim: {}, m: {}, omega: {}",
@@ -247,6 +303,7 @@ fn _bench_client_kv_query(
   c: &mut BenchmarkGroup<criterion::measurement::WallTime>,
   shard: &KVShard,
   example_kv: (String, String),
+  offline_duration: std::time::Duration,
 ) {
   let db = shard.get_db();
   let &FilterParams {
@@ -273,10 +330,64 @@ fn _bench_client_kv_query(
   let cp = CommonParams::from(bp);
   let w = db.get_row_width_self();
 
+  let offline_base_params_bytes = bincode::serialize(bp).unwrap().len();
+  let offline_rhs_hint_bytes = bincode::serialize(bp.get_rhs()).unwrap().len();
+  let offline_public_seed_bytes =
+    bincode::serialize(&bp.get_public_seed()).unwrap().len();
+  let offline_filter_params_bytes =
+    bincode::serialize(&bp.get_filter_params()).unwrap().len();
+  let offline_min_payload_bytes = offline_rhs_hint_bytes
+    + offline_filter_params_bytes
+    + offline_public_seed_bytes;
+  println!(
+    "[KV] Communication bytes (offline): base_params(total): {}, rhs_hint(A*DB): {}, filter_params(subset): {}, public_seed(for deriving A): {}",
+    offline_base_params_bytes,
+    offline_rhs_hint_bytes,
+    offline_filter_params_bytes,
+    offline_public_seed_bytes
+  );
+  println!(
+    "[KV] Communication bytes (offline, minimal payload): {}",
+    offline_min_payload_bytes
+  );
+
   println!("[KV] Starting client query benchmarks");
   let mut _qp = generate_kv_query_params(&cp, bp).unwrap();
   let _q = _qp.generate_query(&kv.key).unwrap();
   let mut _resp = shard.respond(&_q).unwrap();
+  let query_bytes = bincode::serialize(&_q).unwrap().len();
+  let response_bytes = _resp.len();
+  println!(
+    "[KV] Communication bytes (online): query: {}, response: {}, total: {}",
+    query_bytes,
+    response_bytes,
+    query_bytes + response_bytes
+  );
+
+  println!("Offline Comm Bytes: {}", offline_min_payload_bytes);
+  println!("Online Query Bytes: {}", query_bytes);
+  println!("Online Response Bytes: {}", response_bytes);
+  println!("Offline Setup Time: {:?}", offline_duration);
+
+  // Add an end-to-end benchmark to get statistical online time
+  c.bench_function(
+    format!(
+      "[KV] online end-to-end, lwe_dim: {}, matrix_height: {}, omega: {}",
+      bp.get_dim(),
+      db.get_matrix_height(),
+      w
+    ),
+    |b| {
+      b.iter(|| {
+        _qp.used = false;
+        let q = _qp.generate_query(&kv.key).unwrap();
+        let resp = shard.respond(&q).unwrap();
+        let deser: Response = bincode::deserialize(&resp).unwrap();
+        _qp.parse_resp_as_base64(&deser, &kv.key).unwrap();
+      });
+    },
+  );
+
   c.bench_function(
     format!(
       "[KV] create client query params, lwe_dim: {}, matrix_height: {}, omega: {}",
