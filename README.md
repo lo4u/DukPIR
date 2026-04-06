@@ -79,13 +79,13 @@ mvn clean install \
 java --add-modules=jdk.incubator.vector --enable-preview \
   -cp mpc4j-s2pc-pir/target/mpc4j-s2pc-pir-1.1.4-beta-jar-with-dependencies.jar \
   edu.alibaba.mpc4j.s2pc.pir.main.PirMain \
-  kspir_test.conf server
+  kspir_quick_test.conf server
 
 # 终端 2: Client
 java --add-modules=jdk.incubator.vector --enable-preview \
   -cp mpc4j-s2pc-pir/target/mpc4j-s2pc-pir-1.1.4-beta-jar-with-dependencies.jar \
   edu.alibaba.mpc4j.s2pc.pir.main.PirMain \
-  kspir_test.conf client
+  kspir_quick_test.conf client
 ```
 
 ⚠️ `--add-modules=jdk.incubator.vector` 必须添加。

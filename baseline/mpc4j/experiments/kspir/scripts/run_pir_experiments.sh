@@ -17,7 +17,7 @@ fi
 
 CONFIG_FILES=(
   "$CONF_DIR/kspir_exp_len_256B_n20.conf"
-  "$CONF_DIR/kspir_exp_len_30KB_n17.conf"
+  # "$CONF_DIR/kspir_exp_len_30KB_n17.conf"
   "$CONF_DIR/kspir_exp_len_100KB_n14.conf"
   "$CONF_DIR/kspir_exp_n16_to_n20_len_1KB.conf"
 )
@@ -56,14 +56,14 @@ run_one_conf() {
 
   echo "[RUN] $conf_base"
 
-  java -Xmx64g -Xms64g --add-modules=jdk.incubator.vector --enable-preview \
+  java -Xmx200g -Xms64g --add-modules=jdk.incubator.vector --enable-preview \
     -jar "$JAR_PATH" "$conf" server \
     > "$LOG_DIR/${label}.server.log" 2>&1 &
   server_pid=$!
 
   sleep 3
 
-  java -Xmx64g -Xms64g --add-modules=jdk.incubator.vector --enable-preview \
+  java -Xmx128g -Xms4g --add-modules=jdk.incubator.vector --enable-preview \
     -jar "$JAR_PATH" "$conf" client \
     > "$LOG_DIR/${label}.client.log" 2>&1
 
