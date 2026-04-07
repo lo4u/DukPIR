@@ -6,4 +6,7 @@
 *.output
 *.env
 *.jar
+.rlib
+.rmeta
+.d
 production-app

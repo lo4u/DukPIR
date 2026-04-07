@@ -220,7 +220,6 @@ fn _bench_client_query(
   println!("Offline Comm Bytes: {}", offline_min_payload_bytes);
   println!("Online Query Bytes: {}", query_bytes);
   println!("Online Response Bytes: {}", response_bytes);
-  println!("Offline Setup Time: {:?}", offline_duration);
 
   // Add an end-to-end benchmark to get real statistical online time
   c.bench_function(
@@ -367,7 +366,6 @@ fn _bench_client_kv_query(
   println!("Offline Comm Bytes: {}", offline_min_payload_bytes);
   println!("Online Query Bytes: {}", query_bytes);
   println!("Online Response Bytes: {}", response_bytes);
-  println!("Offline Setup Time: {:?}", offline_duration);
 
   // Add an end-to-end benchmark to get statistical online time
   c.bench_function(

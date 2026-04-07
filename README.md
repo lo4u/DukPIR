@@ -55,9 +55,9 @@ key4 value4 0.01
 
 ---
 
-## Baseline 测试
+## Baseline: KPIR
 
-本项目包含用于性能对比的 baseline 实现 `baseline/mpc4j`（[alibaba-edu/mpc4j](https://github.com/alibaba-edu/mpc4j) 的修复版本）。
+本项目包含用于性能对比的 baseline 实现 `baseline/mpc4j`（[alibaba-edu/mpc4j](https://github.com/alibaba-edu/mpc4j) ）。
 
 ### 编译
 
@@ -90,17 +90,15 @@ java --add-modules=jdk.incubator.vector --enable-preview \
 
 ⚠️ `--add-modules=jdk.incubator.vector` 必须添加。
 
-### Bug 修复
-
-本版本修复了原始 mpc4j 的文件路径 bug (`FileNotFoundException: temp/BYTES_CLIENT_BYTES_CLIENT_32.input`)。
-
 ## Baseline：chalametPIR
 
+本项目包含用于性能对比的 baseline 实现 `baseline/chalamet`
+
 编译：
-PIR_LWE_DIM=1024 \
-PIR_ELEM_SIZE_BITS=1024 \
-PIR_NUMBER_OF_ELEMENTS_EXP=5 \
-PIR_PLAINTEXT_BITS=8 \
-BENCH_DB_GEN=true \
+PIR_NUMBER_OF_ELEMENTS_EXP=2 \
+PIR_LWE_DIM=1774 \
+PIR_ELEM_SIZE_BITS=2048 \
+PIR_PLAINTEXT_BITS=9 \
+BENCH_DB_GEN=false \
 BENCH_KV=true \
 cargo bench --bench bench
