@@ -24,8 +24,7 @@ cd "$ROOT_DIR"
 echo "Creating experiment directories in $EXP_DIR..."
 mkdir -p "$LOG_DIR" "$RESULTS_DIR"
 
-# Initialize Summary CSV
-echo "Experiment,N(log2),Dataset_Size,Offline_Time,Offline_Comm(Bytes),Online_Query(Bytes),Online_Resp(Bytes),Online_Time" > "$SUMMARY_FILE"
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 
 run_bench() {
   local N_EXP=$1
@@ -35,7 +34,7 @@ run_bench() {
   local LABEL=$5
   local L_LABEL=$6
 
-  LOG_FILE="$LOG_DIR/${LABEL}.log"
+  LOG_FILE="$LOG_DIR/${TIMESTAMP}_${LABEL}.log"
   echo ""
   echo "================================================================================"
   echo "》》 Running $LABEL"
@@ -54,23 +53,7 @@ run_bench() {
     BENCH_KV=true \
     cargo bench --bench bench > "$LOG_FILE" 2>&1
 
-  # Extract the targeted 5 metrics directly from the log file
-  # The output matches our previous patched format
-  OFFLINE_TIME=$(grep "1. 离线时间" "$LOG_FILE" | awk -F ':' '{print $2}' | xargs || echo "N/A")
-  OFFLINE_COMM=$(grep "2. 离线通信" "$LOG_FILE" | awk -F ':' '{print $2}' | awk '{print $1}' | xargs || echo "N/A")
-  ONLINE_QUERY=$(grep "3. 在线查询大小" "$LOG_FILE" | awk -F ':' '{print $2}' | awk '{print $1}' | xargs || echo "N/A")
-  ONLINE_RESP=$(grep "4. 在线响应大小" "$LOG_FILE" | awk -F ':' '{print $2}' | awk '{print $1}' | xargs || echo "N/A")
-  ONLINE_TIME=$(grep "5. 在线端到端时间" "$LOG_FILE" | awk -F ':' '{print $2}' | xargs || echo "N/A")
-
-  # Wipe out the offline output placeholder if they shouldn't run
-  if [ "$DB_GEN" = "false" ]; then
-    OFFLINE_TIME="Ignored"
-    OFFLINE_COMM="Ignored"
-  fi
-
-  # Record to summary
-  echo "${LABEL},${N_EXP},${L_LABEL},${OFFLINE_TIME},${OFFLINE_COMM},${ONLINE_QUERY},${ONLINE_RESP},${ONLINE_TIME}" >> "$SUMMARY_FILE"
-  echo "✔ Done! Results saved. View details in logs/${LABEL}.log"
+  echo "✔ Done! View details in logs/${LABEL}.log"
 }
 
 # ============================================================================
@@ -107,5 +90,5 @@ echo "所有测试运行完毕！现在自动调用 Python 脚本提取和分析
 echo "================================================================================"
 
 # 调用 Python 脚本一键整理并输出最终报表
-python3 "$EXP_DIR/scripts/extract_results.py"
+python3 "$EXP_DIR/scripts/extract_results.py" "$TIMESTAMP"
 
