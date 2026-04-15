@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# IMPORTANT: mpc4j config key is `entry_bit_length` (unit = bit), not byte.
+# Example: 1KB entry means 8192 bits.
+
 EXP_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MPC4J_ROOT="$(cd "$EXP_ROOT/../.." && pwd)"
 TEMP_DIR="$MPC4J_ROOT/temp"
@@ -17,7 +20,7 @@ fi
 
 CONFIG_FILES=(
   "$CONF_DIR/kspir_exp_len_256B_n20.conf"
-  # "$CONF_DIR/kspir_exp_len_30KB_n17.conf"
+  "$CONF_DIR/kspir_exp_len_30KB_n17.conf"
   "$CONF_DIR/kspir_exp_len_100KB_n14.conf"
   "$CONF_DIR/kspir_exp_n16_to_n20_len_1KB.conf"
 )
@@ -76,6 +79,7 @@ run_one_conf() {
 }
 
 for conf in "${CONFIG_FILES[@]}"; do
+  echo "[INFO] entry_bit_length in conf is BIT length (bytes * 8)."
   run_one_conf "$conf"
 done
 

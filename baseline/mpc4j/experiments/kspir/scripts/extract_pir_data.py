@@ -24,7 +24,7 @@ FILE_RE = re.compile(
 class Row:
     file_name: str
     append: str
-    entry_size: Optional[int]
+    entry_bit_length: Optional[int]
     party_id: int
     party: str
     server_set_size: int
@@ -51,7 +51,7 @@ def to_int(value: str) -> int:
 def parse_output_file(path: Path) -> List[Row]:
     name_match = FILE_RE.match(path.name)
     append = name_match.group("append") if name_match else "unknown"
-    entry_size = int(name_match.group("entry")) if name_match else None
+    entry_bit_length = int(name_match.group("entry")) if name_match else None
 
     rows: List[Row] = []
     with path.open("r", encoding="utf-8") as f:
@@ -62,7 +62,7 @@ def parse_output_file(path: Path) -> List[Row]:
                 Row(
                     file_name=path.name,
                     append=append,
-                    entry_size=entry_size,
+                    entry_bit_length=entry_bit_length,
                     party_id=party_id,
                     party="server" if party_id == 0 else "client",
                     server_set_size=to_int(line["Server Set Size"]),
@@ -93,6 +93,7 @@ def write_raw_csv(rows: Iterable[Row], output_file: Path) -> None:
             [
                 "file_name",
                 "append",
+                "entry_bit_length(bits)",
                 "entry_size(bytes)",
                 "party",
                 "party_id",
@@ -113,7 +114,8 @@ def write_raw_csv(rows: Iterable[Row], output_file: Path) -> None:
                 [
                     r.file_name,
                     r.append,
-                    "" if r.entry_size is None else r.entry_size,
+                    "" if r.entry_bit_length is None else r.entry_bit_length,
+                    "" if r.entry_bit_length is None else r.entry_bit_length // 8,
                     r.party,
                     r.party_id,
                     r.server_set_size,
@@ -132,7 +134,7 @@ def write_raw_csv(rows: Iterable[Row], output_file: Path) -> None:
 def pair_rows(rows: List[Row]) -> Dict[Tuple[str, Optional[int], int, int], Dict[str, Row]]:
     grouped: Dict[Tuple[str, Optional[int], int, int], Dict[str, Row]] = {}
     for r in rows:
-        key = (r.append, r.entry_size, r.server_set_size, r.query_num)
+        key = (r.append, r.entry_bit_length, r.server_set_size, r.query_num)
         if key not in grouped:
             grouped[key] = {}
         grouped[key][r.party] = r
@@ -146,6 +148,7 @@ def write_focus_csv(rows: List[Row], output_file: Path) -> None:
         writer.writerow(
             [
                 "experiment",
+                "entry_bit_length(bits)",
                 "entry_size(bytes)",
                 "set_size(count)",
                 "log_n(bits)",
@@ -158,7 +161,7 @@ def write_focus_csv(rows: List[Row], output_file: Path) -> None:
             ]
         )
         for key in sorted(grouped.keys()):
-            append, entry_size, n, q = key
+            append, entry_bit_length, n, q = key
             srv = grouped[key].get("server")
             cli = grouped[key].get("client")
             if srv is None or cli is None:
@@ -169,7 +172,8 @@ def write_focus_csv(rows: List[Row], output_file: Path) -> None:
             writer.writerow(
                 [
                     append,
-                    "" if entry_size is None else entry_size,
+                    "" if entry_bit_length is None else entry_bit_length,
+                    "" if entry_bit_length is None else entry_bit_length // 8,
                     n,
                     "" if srv.log_n is None else srv.log_n,
                     q,
