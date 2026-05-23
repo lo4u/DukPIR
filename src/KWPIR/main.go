@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"flag"
 	"fmt"
+	"math"
 	"math/rand"
 	"os"
 	"sort"
@@ -66,17 +67,18 @@ type PerformanceStats struct {
 
 // 命令行参数
 type Config struct {
-	FilePath  string
-	NumRows   int
-	KeyLen    int
-	Mode      string
-	Val       float64
-	ProLimit  float64
-	RateOfPop float64
-	PWorse    float64
-	QueryKey  string
-	QueryPop  int
-	use_ntt   int
+	FilePath     string
+	NumRows      int
+	KeyLen       int
+	Mode         string
+	Val          float64
+	ProLimit     float64
+	RateOfPop    float64
+	PWorse       float64
+	QueryKey     string
+	QueryPop     int
+	use_ntt      int
+	write_target string
 }
 
 type ResultInfo struct {
@@ -106,7 +108,7 @@ func main() {
 
 	// 运行在线阶段
 	if config.QueryKey != "" {
-		success, value := ourPIROnline(system, config.QueryKey, config.PWorse, stats)
+		success, value := ourPIROnline(system, config.QueryKey, config.PWorse, stats, config.write_target)
 		fmt.Printf("Query result: success=%v, value=%s\n", success, value)
 	} else {
 		var queryKey string
@@ -116,7 +118,7 @@ func main() {
 			queryKey = system.RandomNonPopularKey
 		}
 
-		success, value := ourPIROnline(system, queryKey, config.PWorse, stats)
+		success, value := ourPIROnline(system, queryKey, config.PWorse, stats, "")
 		// fmt.Printf("Query key: %s\n", queryKey)
 		displayValue := value
 		if len(value) > 64 {
@@ -142,6 +144,7 @@ func parseFlags() Config {
 	flag.StringVar(&config.QueryKey, "qkey", "", "Query key")
 	flag.IntVar(&config.QueryPop, "querypop", 1, "Query from popular database (1) or non-popular (0)")
 	flag.IntVar(&config.use_ntt, "use_ntt", 0, "Whether to use NTT optimization (1: use, 0: not use)")
+	flag.StringVar(&config.write_target, "wt", "", "path of record file for success or failing")
 
 	flag.Parse()
 
@@ -184,7 +187,7 @@ func ourPIROffline(config Config) (*OurPIRSystem, *PerformanceStats) {
 	if config.FilePath != "" {
 		db = readDBFromFile(config.FilePath)
 	} else {
-		db = generateRandomDB(config.NumRows, config.KeyLen)
+		db = generateRandomDB(config.NumRows, config.KeyLen, 1.161)
 	}
 
 	fmt.Printf("Total records: %d\n", len(db.Records))
@@ -283,7 +286,7 @@ func ourPIROffline(config Config) (*OurPIRSystem, *PerformanceStats) {
 }
 
 // ourPIROnline 实现在线阶段
-func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *PerformanceStats) (bool, string) {
+func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *PerformanceStats, wt string) (bool, string) {
 	useFull := rand.Float64() < pWorse
 
 	var databases []*PIRDatabase
@@ -475,6 +478,20 @@ func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *
 
 	success, recoveredValue := processResultsNew(results, uint32(fp), system.ValueChunks, i1, i2)
 
+	if wt != "" {
+		f, err := os.OpenFile(wt, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			fmt.Printf("Warning: Failed to open record file '%s': %v\n", wt, err)
+		} else {
+			defer f.Close()
+			match := (recoveredValue == actualValue)
+			// Format: ActualValue	RecoveredValue	IsMatch	Success
+			_, err = fmt.Fprintf(f, "%s\t%s\t%v\t%v\n", actualValue, recoveredValue, match, success)
+			if err != nil {
+				fmt.Printf("Warning: Failed to write to record file: %v\n", err)
+			}
+		}
+	}
 	// 验证恢复的值
 	if success && recoveredValue != actualValue {
 		fmt.Printf("Warning: Recovered value '%s' doesn't match actual value '%s'\n",
@@ -859,24 +876,38 @@ func readDBFromFile(filePath string) DB {
 	return db
 }
 
-func generateRandomDB(numRows, keyLen int) DB {
+// SaveToFile 将整个数据库记录保存到指定文件中，与 readDBFromFile 的格式保持对应。
+func (db *DB) SaveToFile(filePath string) error {
+	file, err := os.Create(filePath)
+	if err != nil {
+		return fmt.Errorf("error creating file: %v", err)
+	}
+	defer file.Close()
+
+	writer := bufio.NewWriter(file)
+	for _, record := range db.Records {
+		// 使用空格或制表符分隔，这里使用制表符 '\t' 也能被 strings.Fields 正确解析
+		_, err := fmt.Fprintf(writer, "%s\t%s\t%.10f\n", record.Key, record.Value, record.Probability)
+		if err != nil {
+			return fmt.Errorf("error writing record: %v", err)
+		}
+	}
+
+	if err := writer.Flush(); err != nil {
+		return fmt.Errorf("error flushing writer: %v", err)
+	}
+
+	fmt.Printf("Saved %d records to %s\n", len(db.Records), filePath)
+	return nil
+}
+
+func generateRandomDB(numRows, keyLen int, alpha float64) DB {
 	rand.Seed(time.Now().UnixNano())
 	var db DB
 	usedKeys := make(map[string]bool)
 
 	// 生成随机概率值
-	probabilities := make([]float64, numRows)
-	totalProb := 0.0
-
-	for i := 0; i < numRows; i++ {
-		probabilities[i] = rand.Float64()
-		totalProb += probabilities[i]
-	}
-
-	// 归一化概率，使总和为1
-	for i := 0; i < numRows; i++ {
-		probabilities[i] /= totalProb
-	}
+	probabilities := GenerateZipfProbabilities(numRows, alpha)
 
 	// 生成记录
 	for i := 0; i < numRows; i++ {
@@ -1413,7 +1444,7 @@ func testUpdateFunctions(system *OurPIRSystem, stats *PerformanceStats, p_worse 
 
 	// 测试查询新添加的项目
 	fmt.Printf("Querying the added item: \n")
-	success, value := ourPIROnline(system, testKey, p_worse, &PerformanceStats{})
+	success, value := ourPIROnline(system, testKey, p_worse, &PerformanceStats{}, "")
 	fmt.Printf("Query after addition: success=%v, value=%s\n\n", success, value)
 
 	// 测试更新项目
@@ -1430,7 +1461,7 @@ func testUpdateFunctions(system *OurPIRSystem, stats *PerformanceStats, p_worse 
 
 	// 测试查询更新后的项目
 	fmt.Printf("Querying the updated item:\n")
-	success, value = ourPIROnline(system, testKey, p_worse, &PerformanceStats{})
+	success, value = ourPIROnline(system, testKey, p_worse, &PerformanceStats{}, "")
 	fmt.Printf("Query after update: success=%v, value=%s\n\n", success, value)
 
 	// 测试删除项目
@@ -1447,7 +1478,7 @@ func testUpdateFunctions(system *OurPIRSystem, stats *PerformanceStats, p_worse 
 
 	// 测试查询已删除的项目
 	fmt.Printf("Querying the deleted item:\n")
-	success, value = ourPIROnline(system, testKey, p_worse, &PerformanceStats{})
+	success, value = ourPIROnline(system, testKey, p_worse, &PerformanceStats{}, "")
 	fmt.Printf("Query after deletion: success=%v, value=%s\n\n", success, value)
 
 }
@@ -1461,4 +1492,33 @@ func RowMajorToColMajor(m, n, i, j uint64) (r, c uint64) {
 	c = linearIndex / m
 
 	return r, c
+}
+
+// GenerateZipfProbabilities 生成指定总数量 n 且归一化的离散幂律(Zipf)概率分布.
+// n: 元素的总数量
+// s: 偏度参数 (对于"八二开"推荐使用 1.161)
+// 返回值: 长度为 n 的 float64 数组，表示按频率从高到低排序后，每个元素的被访问概率，概率总和为 1.0。
+func GenerateZipfProbabilities(n int, s float64) []float64 {
+	if n <= 0 {
+		return nil
+	}
+
+	probs := make([]float64, n)
+	var sum float64 = 0.0
+
+	// 1. 计算每个元素的非归一化权重: W(k) = 1 / k^s
+	// 这里排名 k 从 1 开始 (1 到 n)
+	for i := 0; i < n; i++ {
+		k := float64(i + 1)
+		weight := 1.0 / math.Pow(k, s)
+		probs[i] = weight
+		sum += weight
+	}
+
+	// 2. 归一化所有的概率，使得总和为 1.0
+	for i := 0; i < n; i++ {
+		probs[i] /= sum
+	}
+
+	return probs
 }

@@ -10,3 +10,6 @@
 .rmeta
 .d
 production-app
+
+#DIR
+draw/*
