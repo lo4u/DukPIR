@@ -106,25 +106,31 @@ func main() {
 		return
 	}
 
-	// 运行在线阶段
-	if config.QueryKey != "" {
-		success, value := ourPIROnline(system, config.QueryKey, config.PWorse, stats, config.write_target)
-		fmt.Printf("Query result: success=%v, value=%s\n", success, value)
-	} else {
-		var queryKey string
-		if config.QueryPop == 1 {
-			queryKey = system.RandomPopularKey
-		} else {
-			queryKey = system.RandomNonPopularKey
-		}
+	// // 运行在线阶段
+	// if config.QueryKey != "" {
+	// 	success, value := ourPIROnline(system, config.QueryKey, config.PWorse, stats, config.write_target, true)
+	// 	fmt.Printf("Query result: success=%v, value=%s\n", success, value)
+	// } else {
+	// 	var queryKey string
+	// 	if config.QueryPop == 1 {
+	// 		queryKey = system.RandomPopularKey
+	// 	} else {
+	// 		queryKey = system.RandomNonPopularKey
+	// 	}
 
-		success, value := ourPIROnline(system, queryKey, config.PWorse, stats, "")
-		// fmt.Printf("Query key: %s\n", queryKey)
-		displayValue := value
-		if len(value) > 64 {
-			displayValue = fmt.Sprintf("%s...(length of %d totally)", value[:64], len(value))
-		}
-		fmt.Printf("Query result: success=%v, value=%s\n", success, displayValue)
+	// 	success, value := ourPIROnline(system, queryKey, config.PWorse, stats, "", false)
+	// 	// fmt.Printf("Query key: %s\n", queryKey)
+	// 	displayValue := value
+	// 	if len(value) > 64 {
+	// 		displayValue = fmt.Sprintf("%s...(length of %d totally)", value[:64], len(value))
+	// 	}
+	// 	fmt.Printf("Query result: success=%v, value=%s\n", success, displayValue)
+	// }
+
+	db := readDBFromFile(config.FilePath)
+	sample := sampleQueriesByProbability(db, config.Mode, config.Val, 1000)
+	for _, r := range sample {
+		_, _ = ourPIROnline(system, r.Key, config.PWorse, stats, config.write_target, r.IsHot)
 	}
 
 	// 输出性能统计
@@ -161,6 +167,91 @@ func parseFlags() Config {
 	}
 
 	return config
+}
+
+type QuerySample struct {
+	Key   string
+	IsHot bool
+}
+
+func initResultFile(path string) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = f.WriteString("QueryKey\tActualValue\tIsHot\tQueryDB\tSuccess\tType\n")
+	return err
+}
+
+func buildHotKeySet(db DB, mode string, val float64) map[string]bool {
+	hotKeys := make(map[string]bool)
+	if len(db.Records) == 0 {
+		return hotKeys
+	}
+
+	sortedRecords := make([]Record, len(db.Records))
+	copy(sortedRecords, db.Records)
+	sort.Slice(sortedRecords, func(i, j int) bool {
+		return sortedRecords[i].Probability > sortedRecords[j].Probability
+	})
+
+	if mode == "lim" {
+		sum := 0.0
+		for _, r := range sortedRecords {
+			hotKeys[r.Key] = true
+			sum += r.Probability
+			if sum >= val {
+				break
+			}
+		}
+		return hotKeys
+	}
+
+	if val < 0 {
+		val = 0
+	}
+	if val > 1 {
+		val = 1
+	}
+	count := int(float64(len(sortedRecords)) * val)
+	if count > len(sortedRecords) {
+		count = len(sortedRecords)
+	}
+	for i := 0; i < count; i++ {
+		hotKeys[sortedRecords[i].Key] = true
+	}
+	return hotKeys
+}
+
+func sampleQueriesByProbability(db DB, mode string, val float64, count int) []QuerySample {
+	if count <= 0 || len(db.Records) == 0 {
+		return nil
+	}
+
+	hotKeys := buildHotKeySet(db, mode, val)
+
+	cdf := make([]float64, len(db.Records))
+	total := 0.0
+	for i, r := range db.Records {
+		total += r.Probability
+		cdf[i] = total
+	}
+	if total <= 0 {
+		return nil
+	}
+
+	samples := make([]QuerySample, count)
+	for i := 0; i < count; i++ {
+		r := rand.Float64() * total
+		idx := sort.Search(len(cdf), func(j int) bool { return cdf[j] >= r })
+		if idx >= len(db.Records) {
+			idx = len(db.Records) - 1
+		}
+		key := db.Records[idx].Key
+		samples[i] = QuerySample{Key: key, IsHot: hotKeys[key]}
+	}
+	return samples
 }
 
 func printPerformanceStats(stats *PerformanceStats) {
@@ -286,8 +377,9 @@ func ourPIROffline(config Config) (*OurPIRSystem, *PerformanceStats) {
 }
 
 // ourPIROnline 实现在线阶段
-func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *PerformanceStats, wt string) (bool, string) {
+func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *PerformanceStats, wt string, isHot bool) (bool, string) {
 	useFull := rand.Float64() < pWorse
+	// useFull = false
 
 	var databases []*PIRDatabase
 	var filter *cf.Filter
@@ -306,7 +398,39 @@ func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *
 	found, actualValue := filter.LookupValue([]byte(queryKey))
 	if !found {
 		fmt.Printf("Warning: Key %s not found in selected database\n", queryKey)
-		return false, ""
+		// return false, ""
+	}
+	fmt.Printf("found it! actualValue = %s\n", actualValue)
+	if wt != "" {
+		f, err := os.OpenFile(wt, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			fmt.Printf("Warning: Failed to open record file '%s': %v\n", wt, err)
+		} else {
+			defer f.Close()
+			var QueryDB string
+			var Type int
+			if useFull {
+				QueryDB = "Full"
+			} else {
+				QueryDB = "Popular"
+			}
+			if !found {
+				Type = 1 // 查询失败
+			} else if !isHot && !useFull {
+				Type = 2 // 误报
+			} else {
+				Type = 0 // 查询成功
+			}
+			if actualValue == "" {
+				actualValue = "wrong"
+			}
+			// Format: QueryKey    ActualValue    IsHot    QueryDB   Success    Type
+			_, err = fmt.Fprintf(f, "%s\t%s\t%v\t%s\t%v\t%v\n", queryKey, actualValue, isHot, QueryDB, found, Type)
+			if err != nil {
+				fmt.Printf("Warning: Failed to write to record file: %v\n", err)
+			}
+		}
+		return found, "test"
 	}
 
 	// 获取位置
@@ -478,20 +602,6 @@ func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *
 
 	success, recoveredValue := processResultsNew(results, uint32(fp), system.ValueChunks, i1, i2)
 
-	if wt != "" {
-		f, err := os.OpenFile(wt, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			fmt.Printf("Warning: Failed to open record file '%s': %v\n", wt, err)
-		} else {
-			defer f.Close()
-			match := (recoveredValue == actualValue)
-			// Format: ActualValue	RecoveredValue	IsMatch	Success
-			_, err = fmt.Fprintf(f, "%s\t%s\t%v\t%v\n", actualValue, recoveredValue, match, success)
-			if err != nil {
-				fmt.Printf("Warning: Failed to write to record file: %v\n", err)
-			}
-		}
-	}
 	// 验证恢复的值
 	if success && recoveredValue != actualValue {
 		fmt.Printf("Warning: Recovered value '%s' doesn't match actual value '%s'\n",
@@ -1444,7 +1554,7 @@ func testUpdateFunctions(system *OurPIRSystem, stats *PerformanceStats, p_worse 
 
 	// 测试查询新添加的项目
 	fmt.Printf("Querying the added item: \n")
-	success, value := ourPIROnline(system, testKey, p_worse, &PerformanceStats{}, "")
+	success, value := ourPIROnline(system, testKey, p_worse, &PerformanceStats{}, "", false)
 	fmt.Printf("Query after addition: success=%v, value=%s\n\n", success, value)
 
 	// 测试更新项目
@@ -1461,7 +1571,7 @@ func testUpdateFunctions(system *OurPIRSystem, stats *PerformanceStats, p_worse 
 
 	// 测试查询更新后的项目
 	fmt.Printf("Querying the updated item:\n")
-	success, value = ourPIROnline(system, testKey, p_worse, &PerformanceStats{}, "")
+	success, value = ourPIROnline(system, testKey, p_worse, &PerformanceStats{}, "", false)
 	fmt.Printf("Query after update: success=%v, value=%s\n\n", success, value)
 
 	// 测试删除项目
@@ -1478,7 +1588,7 @@ func testUpdateFunctions(system *OurPIRSystem, stats *PerformanceStats, p_worse 
 
 	// 测试查询已删除的项目
 	fmt.Printf("Querying the deleted item:\n")
-	success, value = ourPIROnline(system, testKey, p_worse, &PerformanceStats{}, "")
+	success, value = ourPIROnline(system, testKey, p_worse, &PerformanceStats{}, "", false)
 	fmt.Printf("Query after deletion: success=%v, value=%s\n\n", success, value)
 
 }

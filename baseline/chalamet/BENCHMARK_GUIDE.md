@@ -192,7 +192,6 @@ make bench-index-14
 
 **论文中的关键数据来自于：Query + Response + Parsing 的总时间**
 
-如果你在旧版日志中只看到时延而没有通信字节，原因是旧版 `benches/bench.rs` 仅统计时间，没有打印序列化后 query/response 的长度。
 
 ---
 

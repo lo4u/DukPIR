@@ -13,3 +13,4 @@ production-app
 
 #DIR
 draw/*
+.vscode/*
