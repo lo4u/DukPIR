@@ -9,6 +9,9 @@ import time
 import sys
 import os
 
+# 是否启用流行度感知组件（高频子集提取）
+USE_POPULAR = False
+
 def run_test(db_size, key_len, p_worse, querypop, use_ntt, test_name, run_count=10):
     """
     运行单个测试配置
@@ -16,7 +19,7 @@ def run_test(db_size, key_len, p_worse, querypop, use_ntt, test_name, run_count=
     print(f"\n{'='*80}")
     print(f"开始测试: {test_name}")
     print(f"时间: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"参数: db_size={db_size}, key_len={key_len}, p_worse={p_worse}, querypop={querypop}")
+    print(f"参数: db_size={db_size}, key_len={key_len}, p_worse={p_worse}, querypop={querypop}, use_popular={USE_POPULAR}")
     print(f"{'='*80}")
     
     for i in range(1, run_count + 1):
@@ -27,7 +30,7 @@ def run_test(db_size, key_len, p_worse, querypop, use_ntt, test_name, run_count=
         # 构建命令参数
         cmd = ['./production-app', '-n', str(db_size), '-l', str(key_len), 
                '-p_worse', str(p_worse), '-querypop', str(querypop),
-               '-use_ntt', str(use_ntt)]
+             '-use_ntt', str(use_ntt), '-use_popular', str(USE_POPULAR).lower()]
         
         # 执行命令
         try:

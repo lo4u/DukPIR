@@ -49,6 +49,7 @@ type OurPIRSystem struct {
 	RandomPopularKey    string // 随机选择的热门key
 	RandomNonPopularKey string // 随机选择的非热门key
 	ValueChunks         int    // value被分成的块数
+	UsePopular          bool   // 是否启用热门数据库
 	hintUpdateBytes     float64
 }
 
@@ -68,17 +69,18 @@ type PerformanceStats struct {
 
 // 命令行参数
 type Config struct {
-	FilePath  string
-	NumRows   int
-	KeyLen    int
-	Mode      string
-	Val       float64
-	ProLimit  float64
-	RateOfPop float64
-	PWorse    float64
-	QueryKey  string
-	QueryPop  int
-	use_ntt   int
+	FilePath   string
+	NumRows    int
+	KeyLen     int
+	Mode       string
+	Val        float64
+	ProLimit   float64
+	RateOfPop  float64
+	PWorse     float64
+	QueryKey   string
+	QueryPop   int
+	UsePopular bool
+	use_ntt    int
 }
 
 type ResultInfo struct {
@@ -108,13 +110,11 @@ func main() {
 		fmt.Printf("Query result: success=%v, value=%s\n", success, value)
 	} else {
 		var queryKey string
-		// 当前测试关闭热门数据库，默认查询完整库中的key。
-		// if config.QueryPop == 1 {
-		// 	queryKey = system.RandomPopularKey
-		// } else {
-		// 	queryKey = system.RandomNonPopularKey
-		// }
-		queryKey = system.RandomNonPopularKey
+		if config.UsePopular && config.QueryPop == 1 {
+			queryKey = system.RandomPopularKey
+		} else {
+			queryKey = system.RandomNonPopularKey
+		}
 
 		success, value := ourPIROnline(system, queryKey, config.PWorse, stats)
 		// fmt.Printf("Query key: %s\n", queryKey)
@@ -146,6 +146,7 @@ func parseFlags() Config {
 	flag.Float64Var(&config.PWorse, "p_worse", 0.1, "Probability to use full database")
 	flag.StringVar(&config.QueryKey, "qkey", "", "Query key")
 	flag.IntVar(&config.QueryPop, "querypop", 1, "Query from popular database (1) or non-popular (0)")
+	flag.BoolVar(&config.UsePopular, "use_popular", false, "Whether to build and use the popular database")
 	flag.IntVar(&config.use_ntt, "use_ntt", 0, "Whether to use NTT optimization (1: use, 0: not use)")
 
 	flag.Parse()
@@ -206,16 +207,17 @@ func ourPIROffline(config Config) (*OurPIRSystem, *PerformanceStats) {
 	})
 
 	var popularDB DB
-	// 当前测试关闭热门数据库筛选，保留原逻辑：
-	// if config.Mode == "lim" {
-	// 	popularDB = selectByProbabilityLimit(db, config.ProLimit)
-	// 	fmt.Printf("Selected %d records by probability limit %.3f\n",
-	// 		len(popularDB.Records), config.ProLimit)
-	// } else {
-	// 	popularDB = selectByRate(db, config.RateOfPop)
-	// 	fmt.Printf("Selected %d records by rate %.3f\n",
-	// 		len(popularDB.Records), config.RateOfPop)
-	// }
+	if config.UsePopular {
+		if config.Mode == "lim" {
+			popularDB = selectByProbabilityLimit(db, config.ProLimit)
+			fmt.Printf("Selected %d records by probability limit %.3f\n",
+				len(popularDB.Records), config.ProLimit)
+		} else {
+			popularDB = selectByRate(db, config.RateOfPop)
+			fmt.Printf("Selected %d records by rate %.3f\n",
+				len(popularDB.Records), config.RateOfPop)
+		}
+	}
 	fmt.Printf("Offline dataset stats: full_records=%d popular_records=%d rate=%.3f mode=%s\n",
 		len(db.Records), len(popularDB.Records), config.RateOfPop, config.Mode)
 
@@ -253,14 +255,16 @@ func ourPIROffline(config Config) (*OurPIRSystem, *PerformanceStats) {
 	}
 	// dr1 := time.Since(st1)
 	// fmt.Printf("time: %s\n", dr1)
-	// 当前测试关闭热门数据库 filter，保留原逻辑：
-	// popularFilter := cf.NewFilter(uint(len(popularDB.Records) * 2))
-	// for _, record := range popularDB.Records {
-	// 	ok := popularFilter.InsertWithValue([]byte(record.Key), record.Value)
-	// 	if !ok {
-	// 		fmt.Printf("Warning: Failed to insert key %s into popular filter\n", record.Key)
-	// 	}
-	// }
+	var popularFilter *cf.Filter
+	if config.UsePopular {
+		popularFilter = cf.NewFilter(uint(len(popularDB.Records) * 2))
+		for _, record := range popularDB.Records {
+			ok := popularFilter.InsertWithValue([]byte(record.Key), record.Value)
+			if !ok {
+				fmt.Printf("Warning: Failed to insert key %s into popular filter\n", record.Key)
+			}
+		}
+	}
 
 	// 计算value需要分成的块数
 	maxValueLen := 0
@@ -277,22 +281,24 @@ func ourPIROffline(config Config) (*OurPIRSystem, *PerformanceStats) {
 	fmt.Printf("Value maximum length: %d bytes, divided into %d chunks\n", maxValueLen, valueChunks)
 
 	fullDatabases, offlineComm := convertFilterToDatabases(fullFilter, valueChunks, config)
-	// popularDatabases, _ := convertFilterToDatabases(popularFilter, valueChunks, config)
+	var popularDatabases []*PIRDatabase
+	if config.UsePopular && len(popularDB.Records) > 0 {
+		popularDatabases, _ = convertFilterToDatabases(popularFilter, valueChunks, config)
+	}
 	stats.OfflineComm = offlineComm
 
 	system := &OurPIRSystem{
-		FullDatabases: fullDatabases,
-		// PopularDatabases:    popularDatabases,
-		PopularDatabases: nil,
-		FullFilter:       fullFilter,
-		// PopularFilter:       popularFilter,
-		PopularFilter:       nil,
+		FullDatabases:       fullDatabases,
+		PopularDatabases:    popularDatabases,
+		FullFilter:          fullFilter,
+		PopularFilter:       popularFilter,
 		RandomPopularKey:    randomPopularKey,
 		RandomNonPopularKey: randomNonPopularKey,
 		ValueChunks:         valueChunks,
+		UsePopular:          config.UsePopular,
 	}
 	fmt.Printf("Offline PIR layout: valueChunks=%d full_dbs=%d popular_dbs=%d\n",
-		valueChunks, len(fullDatabases), 0)
+		valueChunks, len(fullDatabases), len(popularDatabases))
 
 	fmt.Printf("Offline phase completed: %d full records, %d popular records\n",
 		len(db.Records), len(popularDB.Records))
@@ -304,8 +310,10 @@ func ourPIROffline(config Config) (*OurPIRSystem, *PerformanceStats) {
 
 // ourPIROnline 实现在线阶段
 func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *PerformanceStats) (bool, string) {
-	// useFull := rand.Float64() < pWorse
 	useFull := true
+	if system.UsePopular {
+		useFull = rand.Float64() < pWorse
+	}
 
 	var databases []*PIRDatabase
 	var filter *cf.Filter
@@ -314,11 +322,10 @@ func ourPIROnline(system *OurPIRSystem, queryKey string, pWorse float64, stats *
 		fmt.Printf("Using full database (p_worse=%.3f)\n", pWorse)
 		databases = system.FullDatabases
 		filter = system.FullFilter
-		// } else {
-		// 	fmt.Printf("Using popular database (p_worse=%.3f)\n", pWorse)
-		// 	databases = system.PopularDatabases
-		// 	filter = system.PopularFilter
-		// }
+	} else {
+		fmt.Printf("Using popular database (p_worse=%.3f)\n", pWorse)
+		databases = system.PopularDatabases
+		filter = system.PopularFilter
 	}
 
 	// 验证key是否存在
@@ -1161,14 +1168,12 @@ func (system *OurPIRSystem) DeleteItem(key string) error {
 	// 在完整数据库中查找并删除
 	foundInFull := system.deleteFromFilterAndDatabase(system.FullFilter, system.FullDatabases, key)
 
-	// 当前测试关闭热门数据库，保留原热门库删除逻辑：
-	// if system.PopularFilter != nil && len(system.PopularDatabases) > 0 {
-	// 	foundInPopular := system.deleteFromFilterAndDatabase(system.PopularFilter, system.PopularDatabases, key)
-	// 	if foundInFull || foundInPopular {
-	// 		return nil
-	// 	}
-	// } else if foundInFull {
-	if foundInFull {
+	if system.UsePopular && system.PopularFilter != nil && len(system.PopularDatabases) > 0 {
+		foundInPopular := system.deleteFromFilterAndDatabase(system.PopularFilter, system.PopularDatabases, key)
+		if foundInFull || foundInPopular {
+			return nil
+		}
+	} else if foundInFull {
 		return nil
 	}
 
@@ -1214,10 +1219,10 @@ func (system *OurPIRSystem) deleteFromFilterAndDatabase(filter *cf.Filter, datab
 
 	// 值分片数据库：对应的slot的值分片数据库
 	for chunk := 0; chunk < system.ValueChunks; chunk++ {
-		dbIndex := 4 + slotIndex*system.ValueChunks + chunk
+		dbIndex := 4 + slotIndex
 		if dbIndex < len(databases) {
 			// 对于删除操作，v_new = 0
-			system.UpdatePirDB(bucketIndex, databases[dbIndex], 0)
+			system.UpdatePirDB(bucketIndex*system.ValueChunks+chunk, databases[dbIndex], 0)
 		}
 	}
 
@@ -1253,14 +1258,13 @@ func (system *OurPIRSystem) AddItem(key, value string, is_popular bool) error {
 		return fmt.Errorf("failed to add to full database: %v", err)
 	}
 
-	// 当前测试关闭热门数据库，保留原热门库添加逻辑：
-	// if is_popular && system.PopularFilter != nil && len(system.PopularDatabases) > 0 {
-	// 	fmt.Printf("Adding key-value pair to popular databases : (%s, %s)\n", key, value)
-	// 	err = system.addToFilterAndDatabase(system.PopularFilter, system.PopularDatabases, key, value)
-	// 	if err != nil {
-	// 		return fmt.Errorf("failed to add to popular database: %v", err)
-	// 	}
-	// }
+	if system.UsePopular && is_popular && system.PopularFilter != nil && len(system.PopularDatabases) > 0 {
+		fmt.Printf("Adding key-value pair to popular databases : (%s, %s)\n", key, value)
+		err = system.addToFilterAndDatabase(system.PopularFilter, system.PopularDatabases, key, value)
+		if err != nil {
+			return fmt.Errorf("failed to add to popular database: %v", err)
+		}
+	}
 
 	return nil
 }
@@ -1326,12 +1330,12 @@ func (system *OurPIRSystem) addToFilterAndDatabase(filter *cf.Filter, databases 
 
 	// 值分片数据库：对应的slot的值分片数据库
 	for chunk := 0; chunk < system.ValueChunks; chunk++ {
-		dbIndex := 4 + slotIndex*system.ValueChunks + chunk
+		dbIndex := 4 + slotIndex
 		if dbIndex < len(databases) {
 			// 设置对应的值分片
 			// databases[dbIndex].OfflineMsg.Data[0].PrintToFile("origin_hint.txt")
 			// databases[dbIndex].DB.Data.PrintToFile("origin_DB.txt")
-			system.UpdatePirDB(bucketIndex, databases[dbIndex], valueChunks[chunk])
+			system.UpdatePirDB(bucketIndex*system.ValueChunks+chunk, databases[dbIndex], valueChunks[chunk])
 			// databases[dbIndex].DB.Data.PrintToFile("now_DB.txt")
 			// databases[dbIndex].OfflineMsg.Data[0].PrintToFile("got_hint.txt")
 			// new_pirDBs[dbIndex].OfflineMsg.Data[0].PrintToFile("real_hint.txt")
@@ -1354,17 +1358,16 @@ func (system *OurPIRSystem) UpdateValue(key, newValue string) error {
 		return fmt.Errorf("failed to update in full database: %v", err)
 	}
 
-	// 当前测试关闭热门数据库，保留原热门库修改逻辑：
-	// if system.PopularFilter != nil && len(system.PopularDatabases) > 0 {
-	// 	found, _ := system.PopularFilter.LookupValue([]byte(key))
-	// 	if found {
-	// 		fmt.Printf("Updating key-value pair in popular databases: (%s, %s)\n", key, newValue)
-	// 		err = system.updateValueInFilterAndDatabase(system.PopularFilter, system.PopularDatabases, key, newValue)
-	// 		if err != nil {
-	// 			return fmt.Errorf("failed to update in popular database: %v", err)
-	// 		}
-	// 	}
-	// }
+	if system.UsePopular && system.PopularFilter != nil && len(system.PopularDatabases) > 0 {
+		found, _ := system.PopularFilter.LookupValue([]byte(key))
+		if found {
+			fmt.Printf("Updating key-value pair in popular databases: (%s, %s)\n", key, newValue)
+			err = system.updateValueInFilterAndDatabase(system.PopularFilter, system.PopularDatabases, key, newValue)
+			if err != nil {
+				return fmt.Errorf("failed to update in popular database: %v", err)
+			}
+		}
+	}
 
 	return nil
 }
@@ -1409,10 +1412,10 @@ func (system *OurPIRSystem) updateValueInFilterAndDatabase(filter *cf.Filter, da
 
 	// 更新对应的值分片数据库（指纹数据库不需要更新，因为指纹没有改变）
 	for chunk := 0; chunk < system.ValueChunks; chunk++ {
-		dbIndex := 4 + slotIndex*system.ValueChunks + chunk
+		dbIndex := 4 + slotIndex
 		if dbIndex < len(databases) {
 			// 更新对应的值分片
-			system.UpdatePirDB(bucketIndex, databases[dbIndex], valueChunks[chunk])
+			system.UpdatePirDB(bucketIndex*system.ValueChunks+chunk, databases[dbIndex], valueChunks[chunk])
 		}
 	}
 
