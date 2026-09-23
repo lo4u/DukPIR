@@ -556,7 +556,7 @@ func convertFilterToDatabases(filter *cf.Filter, valueChunks int, config Config)
 			} else {
 				serverState, offlineMsg = pirInst.Setup(db, sharedState, params)
 			}
-			offlineComm := float64(offlineMsg.Size() * uint64(32) / (8.0 * 1024.0 * 1024.0))
+			offlineComm := float64(offlineMsg.Size()) * 32.0 / (8.0 * 1024.0 * 1024.0)
 			fmt.Printf("Fingerprint DB slot %d: buckets=%d params(L=%d, M=%d) offlineComm=%.4f MB\n",
 				slot, numBuckets, params.L, params.M, offlineComm)
 
