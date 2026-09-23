@@ -55,8 +55,8 @@ def test_suite_a():
     use_ntt = 0
     
     for db_size in db_sizes:
-        for p_worse in [0, 1]:
-            for querypop in [0, 1]:
+        for p_worse in [1]:
+            for querypop in [0]:
                 # 跳过 p_worse=0 且 querypop=0 的情况
                 if p_worse == 0 and querypop == 0:
                     continue
@@ -79,8 +79,8 @@ def test_suite_b():
     use_ntt = 0
     
     for db_size, key_len in test_cases:
-        for p_worse in [0, 1]:
-            for querypop in [0, 1]:
+        for p_worse in [1]:
+            for querypop in [0]:
                 # 跳过 p_worse=0 且 querypop=0 的情况
                 if p_worse == 0 and querypop == 0:
                     continue
@@ -118,13 +118,13 @@ def main():
     print(f"{'#'*80}")
     
     # 运行测试套件A
-    # test_suite_()
+    test_suite_a()
     
     # 运行测试套件B  
-    # test_suite_b()
+    test_suite_b()
 
     # 运行测试套件NTT
-    test_suite_ntt()
+    # test_suite_ntt()
     
     end_time = datetime.datetime.now()
     duration = end_time - start_time

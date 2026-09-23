@@ -44,7 +44,7 @@ def extract_performance_statistics(lines: List[str], start_index: int) -> Dict[s
         'Offline Communication': r'Offline Communication:\s*([\d.]+)\s*([KMGT]?B)',
         'Online Query Communication': r'Online Query Communication:\s*([\d.]+)\s*([KMGT]?B)',
         'Online Answer Communication': r'Online Answer Communication:\s*([\d.]+)\s*([KMGT]?B)',
-        'Total Communication': r'Total Communication:\s*([\d.]+)\s*([KMGT]?B)'
+        'Hint Update Communication': r'Hint Update Communication:\s*([\d.]+)\s*(bytes|[KMGT]?B)'
     }
     
     while i < len(lines) and not lines[i].strip().startswith('开始测试:'):
@@ -163,7 +163,7 @@ def write_to_csv(results: List[Dict[str, str]], output_filename: str):
         'Offline Time', 'Add operation time', 'Update operation time', 'Delete operation time',
         'Online Query Time', 'Online Response Time', 'Total Online Time',
         'Offline Communication', 'Online Query Communication', 
-        'Online Answer Communication', 'Total Communication'
+        'Online Answer Communication', 'Hint Update Communication'
     ]
     
     # 确保所有字段都在fieldnames中
