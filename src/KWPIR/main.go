@@ -1133,6 +1133,104 @@ func (system *OurPIRSystem) UpdatePirDB(i int, pirDB *PIRDatabase, v_new uint64)
 	return nil
 }
 
+// UpdatePirDBBatch 批量更新同一个PIR数据库中的多个条目，并合并hint增量。
+func (system *OurPIRSystem) UpdatePirDBBatch(updates map[uint64]uint64, pirDB *PIRDatabase) error {
+	db := pirDB.DB
+	info := db.Info
+	params := pirDB.Params
+
+	if len(pirDB.OfflineMsg.Data) == 0 {
+		return fmt.Errorf("offline message is empty")
+	}
+	offlineMatrix := pirDB.OfflineMsg.Data[0]
+	hintDeltas := make(map[uint64][]uint64)
+
+	addHintDelta := func(row, originalCol, delta uint64) {
+		if row >= uint64(offlineMatrix.Rows) {
+			return
+		}
+		rowDelta, ok := hintDeltas[row]
+		if !ok {
+			rowDelta = make([]uint64, offlineMatrix.Cols)
+			hintDeltas[row] = rowDelta
+		}
+		for c := uint64(0); c < uint64(offlineMatrix.Cols); c++ {
+			rowDelta[c] += pirDB.SharedState.Data[0].Get(originalCol, c) * delta
+		}
+	}
+
+	for index, newValue := range updates {
+		i := index
+		if info.Packing > 0 {
+			packIndex := i / info.Packing
+			indexInPack := i % info.Packing
+			originalCol := packIndex % params.M
+			row := packIndex / params.M
+			squishCol := originalCol / info.Squishing
+			offsetInSquish := originalCol % info.Squishing
+
+			currentSquishedVal := db.Data.Get(row, squishCol)
+			mask := uint64((1 << info.Basis) - 1)
+			originalVals := make([]uint64, info.Squishing)
+			for k := uint64(0); k < info.Squishing; k++ {
+				originalVals[k] = (currentSquishedVal >> (k * info.Basis)) & mask
+			}
+			currentPackedVal := originalVals[offsetInSquish]
+			unpacked := make([]uint64, info.Packing)
+			temp := currentPackedVal
+			for j := uint64(0); j < info.Packing; j++ {
+				unpacked[j] = temp % (1 << info.Row_length)
+				temp >>= info.Row_length
+			}
+			newPackedVal := uint64(0)
+			coeff := uint64(1)
+			for j := uint64(0); j < info.Packing; j++ {
+				value := unpacked[j]
+				if j == indexInPack {
+					value = newValue
+				}
+				newPackedVal += value * coeff
+				coeff *= 1 << info.Row_length
+			}
+			originalVals[offsetInSquish] = newPackedVal
+			newSquishedVal := uint64(0)
+			for k := uint64(0); k < info.Squishing; k++ {
+				newSquishedVal += originalVals[k] << (k * info.Basis)
+			}
+			db.Data.Set(newSquishedVal, row, squishCol)
+			addHintDelta(row, originalCol, newPackedVal-currentPackedVal)
+			continue
+		}
+
+		baseRow := (i / params.M) * info.Ne
+		baseCol := i % params.M
+		for j := uint64(0); j < info.Ne; j++ {
+			row := baseRow + j
+			squishCol := baseCol / info.Squishing
+			offsetInSquish := baseCol % info.Squishing
+			currentSquishedVal := db.Data.Get(row, squishCol)
+			mask := uint64((1 << info.Basis) - 1)
+			oldComponent := (currentSquishedVal >> (offsetInSquish * info.Basis)) & mask
+			newComponent := pir.Base_p(info.P, newValue, j)
+			newSquishedVal := currentSquishedVal &^ (mask << (offsetInSquish * info.Basis))
+			newSquishedVal |= newComponent << (offsetInSquish * info.Basis)
+			db.Data.Set(newSquishedVal, row, squishCol)
+			addHintDelta(row, baseCol, newComponent-oldComponent)
+		}
+	}
+
+	for row, rowDelta := range hintDeltas {
+		currentRow := row
+		for c, delta := range rowDelta {
+			currentVal := offlineMatrix.Get(currentRow, uint64(c))
+			offlineMatrix.Set((currentVal+delta)%(uint64(1)<<32), currentRow, uint64(c))
+		}
+		system.recordHintUpdateVector(row, offlineMatrix.Cols)
+	}
+
+	return nil
+}
+
 // getKeySlotPosition 获取key在filter中的确切位置（桶和slot）
 func getKeySlotPosition(filter *cf.Filter, key string) (int, int) {
 	bucketPow := filter.GetBucketPow()
@@ -1410,12 +1508,15 @@ func (system *OurPIRSystem) updateValueInFilterAndDatabase(filter *cf.Filter, da
 		valueChunks[chunk] = binary.BigEndian.Uint64(chunkBytes)
 	}
 
-	// 更新对应的值分片数据库（指纹数据库不需要更新，因为指纹没有改变）
-	for chunk := 0; chunk < system.ValueChunks; chunk++ {
-		dbIndex := 4 + slotIndex
-		if dbIndex < len(databases) {
-			// 更新对应的值分片
-			system.UpdatePirDB(bucketIndex*system.ValueChunks+chunk, databases[dbIndex], valueChunks[chunk])
+	// 批量更新对应的值分片数据库，避免逐chunk重复发送和统计hint向量。
+	dbIndex := 4 + slotIndex
+	if dbIndex < len(databases) {
+		updates := make(map[uint64]uint64, system.ValueChunks)
+		for chunk := 0; chunk < system.ValueChunks; chunk++ {
+			updates[uint64(bucketIndex*system.ValueChunks+chunk)] = valueChunks[chunk]
+		}
+		if err := system.UpdatePirDBBatch(updates, databases[dbIndex]); err != nil {
+			return err
 		}
 	}
 
