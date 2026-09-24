@@ -94,44 +94,30 @@ func main() {
 
 	// 运行离线阶段并统计性能
 	startOffline := time.Now()
-	system, stats := ourPIROffline(config)
+	_, stats := ourPIROffline(config)
 	stats.OfflineTime = time.Since(startOffline)
-	//WARNING: 只测试离线阶段，在此处直接返回
-	if config.use_ntt == 1 {
-		printPerformanceStats(stats)
-		return
-	}
-
-	// 运行在线阶段
-	if config.QueryKey != "" {
-		success, value := ourPIROnline(system, config.QueryKey, config.PWorse, stats)
-		fmt.Printf("Query result: success=%v, value=%s\n", success, value)
-	} else {
-		var queryKey string
-		// 当前测试关闭热门数据库，默认查询完整库中的key。
-		// if config.QueryPop == 1 {
-		// 	queryKey = system.RandomPopularKey
-		// } else {
-		// 	queryKey = system.RandomNonPopularKey
-		// }
-		queryKey = system.RandomNonPopularKey
-
-		success, value := ourPIROnline(system, queryKey, config.PWorse, stats)
-		// fmt.Printf("Query key: %s\n", queryKey)
-		displayValue := value
-		if len(value) > 64 {
-			displayValue = fmt.Sprintf("%s...(length of %d totally)", value[:64], len(value))
-		}
-		fmt.Printf("Query result: success=%v, value=%s\n", success, displayValue)
-	}
-
-	if config.QueryKey == "" {
-		// 普通查询完成后单独测试增删改及其hint同步通信开销，避免混入NTT测试。
-		testUpdateFunctions(system, stats, config.PWorse, config.KeyLen)
-	}
-
-	// 输出性能统计
+	// 当前分支只测试离线阶段，不进入在线查询或增删改测试。
 	printPerformanceStats(stats)
+
+	// 在线阶段保留原逻辑，但当前分支不执行：
+	// if config.QueryKey != "" {
+	// 	success, value := ourPIROnline(system, config.QueryKey, config.PWorse, stats)
+	// 	fmt.Printf("Query result: success=%v, value=%s\n", success, value)
+	// } else {
+	// 	var queryKey string
+	// 	queryKey = system.RandomNonPopularKey
+	// 	success, value := ourPIROnline(system, queryKey, config.PWorse, stats)
+	// 	displayValue := value
+	// 	if len(value) > 64 {
+	// 		displayValue = fmt.Sprintf("%s...(length of %d totally)", value[:64], len(value))
+	// 	}
+	// 	fmt.Printf("Query result: success=%v, value=%s\n", success, displayValue)
+	// }
+
+	// 增删改和 hint 同步测试保留原逻辑，但当前分支不执行：
+	// if config.QueryKey == "" {
+	// 	testUpdateFunctions(system, stats, config.PWorse, config.KeyLen)
+	// }
 }
 
 // parseFlags 解析命令行参数
@@ -206,16 +192,15 @@ func ourPIROffline(config Config) (*OurPIRSystem, *PerformanceStats) {
 	})
 
 	var popularDB DB
-	// 当前测试关闭热门数据库筛选，保留原逻辑：
-	// if config.Mode == "lim" {
-	// 	popularDB = selectByProbabilityLimit(db, config.ProLimit)
-	// 	fmt.Printf("Selected %d records by probability limit %.3f\n",
-	// 		len(popularDB.Records), config.ProLimit)
-	// } else {
-	// 	popularDB = selectByRate(db, config.RateOfPop)
-	// 	fmt.Printf("Selected %d records by rate %.3f\n",
-	// 		len(popularDB.Records), config.RateOfPop)
-	// }
+	if config.Mode == "lim" {
+		popularDB = selectByProbabilityLimit(db, config.ProLimit)
+		fmt.Printf("Selected %d records by probability limit %.3f\n",
+			len(popularDB.Records), config.ProLimit)
+	} else {
+		popularDB = selectByRate(db, config.RateOfPop)
+		fmt.Printf("Selected %d records by rate %.3f\n",
+			len(popularDB.Records), config.RateOfPop)
+	}
 	fmt.Printf("Offline dataset stats: full_records=%d popular_records=%d rate=%.3f mode=%s\n",
 		len(db.Records), len(popularDB.Records), config.RateOfPop, config.Mode)
 
@@ -253,14 +238,16 @@ func ourPIROffline(config Config) (*OurPIRSystem, *PerformanceStats) {
 	}
 	// dr1 := time.Since(st1)
 	// fmt.Printf("time: %s\n", dr1)
-	// 当前测试关闭热门数据库 filter，保留原逻辑：
-	// popularFilter := cf.NewFilter(uint(len(popularDB.Records) * 2))
-	// for _, record := range popularDB.Records {
-	// 	ok := popularFilter.InsertWithValue([]byte(record.Key), record.Value)
-	// 	if !ok {
-	// 		fmt.Printf("Warning: Failed to insert key %s into popular filter\n", record.Key)
-	// 	}
-	// }
+	var popularFilter *cf.Filter
+	if len(popularDB.Records) > 0 {
+		popularFilter = cf.NewFilter(uint(len(popularDB.Records) * 2))
+		for _, record := range popularDB.Records {
+			ok := popularFilter.InsertWithValue([]byte(record.Key), record.Value)
+			if !ok {
+				fmt.Printf("Warning: Failed to insert key %s into popular filter\n", record.Key)
+			}
+		}
+	}
 
 	// 计算value需要分成的块数
 	maxValueLen := 0
@@ -276,23 +263,25 @@ func ourPIROffline(config Config) (*OurPIRSystem, *PerformanceStats) {
 
 	fmt.Printf("Value maximum length: %d bytes, divided into %d chunks\n", maxValueLen, valueChunks)
 
-	fullDatabases, offlineComm := convertFilterToDatabases(fullFilter, valueChunks, config)
-	// popularDatabases, _ := convertFilterToDatabases(popularFilter, valueChunks, config)
-	stats.OfflineComm = offlineComm
+	fullDatabases, fullOfflineComm := convertFilterToDatabases(fullFilter, valueChunks, config)
+	var popularDatabases []*PIRDatabase
+	var popularOfflineComm float64
+	if popularFilter != nil {
+		popularDatabases, popularOfflineComm = convertFilterToDatabases(popularFilter, valueChunks, config)
+	}
+	stats.OfflineComm = fullOfflineComm + popularOfflineComm
 
 	system := &OurPIRSystem{
-		FullDatabases: fullDatabases,
-		// PopularDatabases:    popularDatabases,
-		PopularDatabases: nil,
-		FullFilter:       fullFilter,
-		// PopularFilter:       popularFilter,
-		PopularFilter:       nil,
+		FullDatabases:       fullDatabases,
+		PopularDatabases:    popularDatabases,
+		FullFilter:          fullFilter,
+		PopularFilter:       popularFilter,
 		RandomPopularKey:    randomPopularKey,
 		RandomNonPopularKey: randomNonPopularKey,
 		ValueChunks:         valueChunks,
 	}
 	fmt.Printf("Offline PIR layout: valueChunks=%d full_dbs=%d popular_dbs=%d\n",
-		valueChunks, len(fullDatabases), 0)
+		valueChunks, len(fullDatabases), len(popularDatabases))
 
 	fmt.Printf("Offline phase completed: %d full records, %d popular records\n",
 		len(db.Records), len(popularDB.Records))
@@ -556,7 +545,7 @@ func convertFilterToDatabases(filter *cf.Filter, valueChunks int, config Config)
 			} else {
 				serverState, offlineMsg = pirInst.Setup(db, sharedState, params)
 			}
-			offlineComm := float64(offlineMsg.Size() * uint64(32) / (8.0 * 1024.0 * 1024.0))
+			offlineComm := float64(offlineMsg.Size()) * 32.0 / (8.0 * 1024.0 * 1024.0)
 			fmt.Printf("Fingerprint DB slot %d: buckets=%d params(L=%d, M=%d) offlineComm=%.4f MB\n",
 				slot, numBuckets, params.L, params.M, offlineComm)
 
