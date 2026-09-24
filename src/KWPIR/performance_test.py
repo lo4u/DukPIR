@@ -56,13 +56,13 @@ def test_suite_a():
     
     for db_size in db_sizes:
         for p_worse in [1]:
-            for querypop in [0]:
+            for querypop in [1]:
                 # 跳过 p_worse=0 且 querypop=0 的情况
                 if p_worse == 0 and querypop == 0:
                     continue
                 
                 test_name = f"A_db{db_size}_len{key_len}_p{p_worse}_q{querypop}"
-                run_test(db_size, key_len, p_worse, querypop, use_ntt, test_name)
+                run_test(db_size, key_len, p_worse, querypop, use_ntt, test_name, run_count=1)
 
 def test_suite_b():
     """
@@ -80,13 +80,13 @@ def test_suite_b():
     
     for db_size, key_len in test_cases:
         for p_worse in [1]:
-            for querypop in [0]:
+            for querypop in [1]:
                 # 跳过 p_worse=0 且 querypop=0 的情况
                 if p_worse == 0 and querypop == 0:
                     continue
                 
                 test_name = f"B_db{db_size}_len{key_len}_p{p_worse}_q{querypop}"
-                run_test(db_size, key_len, p_worse, querypop, use_ntt, test_name)
+                run_test(db_size, key_len, p_worse, querypop, use_ntt, test_name, run_count=1)
 
 def test_suite_ntt():
     """
