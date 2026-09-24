@@ -534,7 +534,7 @@ func convertFilterToDatabases(filter *cf.Filter, valueChunks int, config Config)
 			} else {
 				serverState, offlineMsg = pirInst.Setup(db, sharedState, params)
 			}
-			offlineComm := float64(offlineMsg.Size() * uint64(32) / (8.0 * 1024.0 * 1024.0))
+			offlineComm := float64(offlineMsg.Size() * 32.0 / (8.0 * 1024.0 * 1024.0))
 
 			resultChan <- struct {
 				index       int
@@ -754,9 +754,9 @@ func calculateMsgSize(msgs []pir.Msg) float64 {
 	totalBytes := 0.0
 	for _, msg := range msgs {
 		for _, matrix := range msg.Data {
-			// 每个矩阵元素占8字节（uint64）
+			// 每个矩阵元素占4字节（uint32）
 			elements := float64(matrix.Rows * matrix.Cols)
-			totalBytes += elements * 8.0
+			totalBytes += elements * 4.0
 		}
 	}
 	return totalBytes / (1024.0 * 1024.0) // 转换为MB
@@ -768,9 +768,9 @@ func calculateMsgSliceSize(msgSlices []pir.MsgSlice) float64 {
 	for _, msgSlice := range msgSlices {
 		for _, msg := range msgSlice.Data {
 			for _, matrix := range msg.Data {
-				// 每个矩阵元素占8字节（uint64）
+				// 每个矩阵元素占4字节（uint32）
 				elements := float64(matrix.Rows * matrix.Cols)
-				totalBytes += elements * 8.0
+				totalBytes += elements * 4.0
 			}
 		}
 	}
